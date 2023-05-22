@@ -37,6 +37,7 @@ feeds and have them delivered to their email inbox.
 
 ### Subscriptions
 
+- Subscriptions have a UUID identifier.
 - Subscriptions reference a particular Feed
 - Subscriptions have a name, which is a human-readable name for the Feed. It defaults to
   the title of the Feed, but can be overridden by the user.
@@ -62,6 +63,7 @@ feeds and have them delivered to their email inbox.
 
 ### Feed
 
+- Feeds have a UUID identifier.
 - Feeds have a URL, which is the URL of the feed from where the content is pulled.
 - Feeds have a type, which may be Atom, RSS, or JSON Feed. This will be determined
   automatically when the feed is added.
@@ -79,6 +81,7 @@ feeds and have them delivered to their email inbox.
 
 ### Feed Items
 
+- Feed Items have a UUID identifier.
 - Feed Items have a title. If the item does not include one, the description will be used if
   it exists, otherwise the URL will be used if present, otherwise the feed title and date
   will be used.
@@ -89,7 +92,7 @@ feeds and have them delivered to their email inbox.
 - Feed Items may have an author.
 - Feed Items may have one or more categories.
 
-# Notes:
+### Notes:
 
 - Need to periodically clean up the database of old Feeds/FeedItems. 
   - Feeds should be deleted if they have no subscriptions, and their FeedItems at the same time. 
@@ -101,3 +104,40 @@ feeds and have them delivered to their email inbox.
       some interesting stats.
   - Ideally this is done on an automatic schedule, but we should also probably have a 
     manual way for the admin to do this.
+
+## API:
+
+### Users:
+
+- `GET /api/users` - List all users. Admin only.
+- `POST /api/users` - Create a new user. Admin only.
+- `GET /api/users/{id}` - Get a user by email. Admin or given user only.
+- `PUT /api/users/{id}` - Update a user. Admin or given user only.
+- `DELETE /api/users/{id}` - Delete a user. Admin only.
+
+### Authentication:
+
+- `POST /api/auth/login` - Login with email and password, returns a JWT.
+- `POST /api/auth/logout` - Logout, invalidates the JWT.
+- `POST /api/auth/password-reset` - Request a password reset email.
+
+### Subscriptions:
+
+- `GET /api/users/{id}/subscriptions` - List all subscriptions for a user. User only.
+- `POST /api/users/{id}/subscriptions` - Create a new subscription for a user. User only.
+- `GET /api/users/{id}/subscriptions/{id}` - Get a subscription by id. User only.
+- `PUT /api/users/{id}/subscriptions/{id}` - Update a subscription. User only.
+- `DELETE /api/users/{id}/subscriptions/{id}` - Delete a subscription. User only.
+
+### Feeds:
+
+- `GET /api/feeds` - List all feeds. Admin only.
+- `POST /api/feeds` - Create a new feed. Admin only.
+- `GET /api/feeds/{id}` - Get a feed by id. Admin only.
+- `PUT /api/feeds/{id}` - Update a feed. Admin only.
+- `DELETE /api/feeds/{id}` - Delete a feed. Admin only.
+
+### Feed Items:
+
+- `GET /api/feeds/{id}/items` - List all feed items for a feed. Admin only.
+- `GET /api/feeds/{id}/items/{id}` - Get a feed item by id. Admin only.
