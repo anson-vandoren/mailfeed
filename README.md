@@ -6,6 +6,12 @@ feeds and have them delivered to their email inbox.
 
 # Design notes
 
+## Dev setup
+
+- Install Rust and Cargo
+- `cargo install diesel_cli --no-default-features --features "sqlite"`
+- `sudo apt install libsqlite3-dev`
+
 ## Data model
 
 ### Users
@@ -37,7 +43,6 @@ feeds and have them delivered to their email inbox.
 
 ### Subscriptions
 
-- Subscriptions have a UUID identifier.
 - Subscriptions reference a particular Feed
 - Subscriptions have a name, which is a human-readable name for the Feed. It defaults to
   the title of the Feed, but can be overridden by the user.
@@ -63,7 +68,6 @@ feeds and have them delivered to their email inbox.
 
 ### Feed
 
-- Feeds have a UUID identifier.
 - Feeds have a URL, which is the URL of the feed from where the content is pulled.
 - Feeds have a type, which may be Atom, RSS, or JSON Feed. This will be determined
   automatically when the feed is added.
@@ -81,11 +85,10 @@ feeds and have them delivered to their email inbox.
 
 ### Feed Items
 
-- Feed Items have a UUID identifier.
 - Feed Items have a title. If the item does not include one, the description will be used if
   it exists, otherwise the URL will be used if present, otherwise the feed title and date
   will be used.
-- Feed Items have a URL, which is the URL of the item.
+- Feed Items have a link, which is the URL of the item.
 - Feed Items have a publication date. If the item does not include one, the time the item
   was received will be used.
 - Feed Items may have a description.
