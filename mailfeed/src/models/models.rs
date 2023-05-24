@@ -3,6 +3,7 @@ use serde::{Serialize, Deserialize};
 use crate::schema::*;
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[diesel(belongs_to(Feed))]
 #[diesel(table_name = feed_items)]
 pub struct FeedItem {
     pub id: i32,
@@ -17,6 +18,7 @@ pub struct FeedItem {
 
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[diesel(belongs_to(Subscription))]
 #[diesel(table_name = feeds)]
 pub struct Feed {
     pub id: i32,
@@ -29,7 +31,8 @@ pub struct Feed {
     pub error_message: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Associations, Insertable)]
+#[diesel(belongs_to(User))]
 #[diesel(table_name = subscriptions)]
 pub struct Subscription {
     pub id: i32,

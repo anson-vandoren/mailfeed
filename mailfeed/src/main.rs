@@ -4,6 +4,7 @@ mod handlers;
 mod routes;
 mod models;
 mod schema;
+mod test_helpers;
 
 use crate::routes::configure;
 use actix_files::Files;
@@ -43,4 +44,17 @@ fn initialize_db_pool() -> DbPool {
     r2d2::Pool::builder()
         .build(manager)
         .expect("Database URL should be a valid path to SQLite DB file")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_initialize_db_pool() {
+        let pool = initialize_db_pool();
+        let mut conn = pool.get().unwrap();
+        let result = diesel::sql_query("SELECT 1").execute(&mut conn);
+        assert_eq!(result, Ok(0));
+    }
 }
