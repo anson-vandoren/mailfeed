@@ -1,4 +1,4 @@
-use crate::models::user::{NewUser, User, UserQuery};
+use crate::models::user::{NewUser, PartialUser, User, UserCreationError, UserQuery};
 use crate::DbPool;
 use actix_web::{web, HttpResponse, Responder};
 use serde::Deserialize;
@@ -18,11 +18,16 @@ pub async fn create_user(pool: web::Data<DbPool>, new_user: web::Json<NewUser>) 
 
     match db_result {
         Ok(_) => {
+            log::info!("created new user: {:?}", new_user.email);
             let user = User::get(&mut conn, UserQuery::Email(new_user.email.clone())).unwrap();
             let user_json = serde_json::to_string(&user).unwrap();
             HttpResponse::Ok().body(user_json)
         }
-        Err(_) => HttpResponse::BadRequest().body("Failed to create user"),
+        Err(UserCreationError::EmailExists) => HttpResponse::BadRequest().body("Email exists"),
+        Err(UserCreationError::PasswordTooShort) => {
+            HttpResponse::BadRequest().body("Password too short")
+        }
+        Err(_) => HttpResponse::InternalServerError().body("Error creating user"),
     }
 }
 
@@ -40,8 +45,23 @@ pub async fn get_user(pool: web::Data<DbPool>, path: web::Path<UserPath>) -> imp
     }
 }
 
-pub async fn update_user() -> impl Responder {
-    HttpResponse::Ok().body("update_user")
+pub async fn update_user(
+    pool: web::Data<DbPool>,
+    path: web::Path<UserPath>,
+    updates: web::Json<PartialUser>,
+) -> impl Responder {
+    let id = path.id.parse::<i32>();
+
+    match id {
+        Ok(id) => {
+            let mut conn = pool.get().expect("couldn't get db connection from pool");
+
+            let updated_user = User::update(&mut conn, id, &updates).unwrap();
+            let user_json = serde_json::to_string(&updated_user).unwrap();
+            HttpResponse::Ok().body(user_json)
+        }
+        Err(_) => HttpResponse::BadRequest().body("Invalid user ID"),
+    }
 }
 
 pub async fn delete_user() -> impl Responder {

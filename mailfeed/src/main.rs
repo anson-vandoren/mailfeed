@@ -1,14 +1,14 @@
 extern crate diesel;
 
 mod handlers;
-mod routes;
 mod models;
+mod routes;
 mod schema;
 mod test_helpers;
 
 use crate::routes::configure;
 use actix_files::Files;
-use actix_web::{web, App, HttpServer};
+use actix_web::{middleware, web, App, HttpServer};
 use diesel::{prelude::*, r2d2};
 use dotenvy::dotenv;
 use std::env;
@@ -26,6 +26,11 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
+            .wrap(middleware::Logger::default())
+            .wrap(middleware::Compress::default())
+            .wrap(middleware::NormalizePath::new(
+                middleware::TrailingSlash::Trim,
+            ))
             .app_data(web::Data::new(pool.clone()))
             .configure(configure)
             .service(Files::new("/", &public_path).index_file("index.html"))

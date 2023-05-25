@@ -20,19 +20,41 @@ pub struct User {
     pub roles: String,           // CSV
 }
 
+#[derive(Debug, Serialize, Deserialize, AsChangeset)]
+#[diesel(table_name = users)]
+pub struct PartialUser {
+    pub login_email: Option<String>,
+    pub send_email: Option<String>,
+    pub is_active: Option<bool>,
+    pub daily_send_time: Option<String>, // HH:MM+HH:MM
+    pub roles: Option<String>,           // CSV
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewUser {
     pub email: String,
     pub password: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub enum UserCreationError {
+    EmailExists,
+    PasswordHashError,
+    PasswordTooShort,
+    DatabaseError,
+}
+
+#[derive(Debug)]
 pub enum UserQuery {
     Id(i32),
     Email(String),
 }
 
 impl User {
-    pub fn create<'a>(conn: &mut SqliteConnection, new_user: &'a NewUser) -> QueryResult<usize> {
+    pub fn create<'a>(
+        conn: &mut SqliteConnection,
+        new_user: &'a NewUser,
+    ) -> Result<User, UserCreationError> {
         use crate::schema::users::dsl::*;
         let user_exists = users
             .filter(login_email.eq(&new_user.email))
@@ -40,10 +62,21 @@ impl User {
             .is_ok();
 
         if user_exists {
-            return Err(diesel::result::Error::RollbackTransaction);
+            log::warn!("User with email {} already exists", new_user.email);
+            return Err(UserCreationError::EmailExists);
         }
 
-        let password_hash = Self::hash_password(&new_user.password)?;
+        let password_hash = match Self::hash_password(&new_user.password) {
+            Ok(hash) => hash,
+            Err(UserCreationError::PasswordTooShort) => {
+                log::warn!("Password too short");
+                return Err(UserCreationError::PasswordTooShort);
+            }
+            Err(_) => {
+                log::error!("Failed to hash password");
+                return Err(UserCreationError::PasswordHashError);
+            }
+        };
 
         let user = User {
             id: None,
@@ -56,9 +89,29 @@ impl User {
             roles: "user".into(),
         };
 
-        diesel::insert_into(users::table())
+        match diesel::insert_into(users::table())
             .values(&user)
             .execute(conn)
+        {
+            Ok(_) => Ok(user),
+            Err(err) => {
+                log::error!("Failed to insert user into database: {:?}", err);
+                Err(UserCreationError::DatabaseError)
+            }
+        }?;
+
+        let user_in_db = match users
+            .filter(login_email.eq(&new_user.email))
+            .first::<User>(conn)
+        {
+            Ok(user) => user,
+            Err(err) => {
+                log::error!("Failed to get user from database: {:?}", err);
+                return Err(UserCreationError::DatabaseError);
+            }
+        };
+
+        Ok(user_in_db)
     }
 
     pub fn exists(conn: &mut SqliteConnection, email: &str) -> bool {
@@ -71,48 +124,63 @@ impl User {
 
     pub fn get(conn: &mut SqliteConnection, query: UserQuery) -> Option<User> {
         use crate::schema::users::dsl::*;
+        log::info!("Getting user: {:?}", query);
         match query {
             UserQuery::Id(user_id) => users.filter(id.eq(user_id)).first::<User>(conn).ok(),
             UserQuery::Email(email) => users.filter(login_email.eq(email)).first::<User>(conn).ok(),
         }
     }
 
-    pub fn update(conn: &mut SqliteConnection, user: &User) -> QueryResult<usize> {
+    pub fn update(
+        conn: &mut SqliteConnection,
+        user_id: i32,
+        updates: &PartialUser,
+    ) -> Result<User, UserCreationError> {
         use crate::schema::users::dsl::*;
 
-        let password_hash = Self::hash_password(&user.password)?;
+        let updates = updates.clone();
 
-        let user = User {
-            id: user.id,
-            login_email: user.login_email.clone(),
-            send_email: user.send_email.clone(),
-            password: password_hash,
-            created_at: user.created_at,
-            is_active: user.is_active,
-            daily_send_time: user.daily_send_time.clone(),
-            roles: user.roles.clone(),
-        };
+        if updates.login_email.is_some() {
+            let user_exists = User::exists(conn, &updates.login_email.clone().unwrap());
+            if user_exists {
+                log::warn!(
+                    "User with email {} already exists",
+                    updates.login_email.clone().unwrap()
+                );
+                return Err(UserCreationError::EmailExists);
+            }
+        }
+        log::info!("Updating user (id={:?}): {:?}", user_id, updates);
 
-        diesel::update(users.filter(id.eq(user.id.unwrap())))
-            .set(&user)
-            .execute(conn)
+        match diesel::update(users.filter(id.eq(user_id)))
+            .set(updates)
+            .get_result::<User>(conn)
+        {
+            Ok(user) => Ok(user),
+            Err(err) => {
+                log::error!("Failed to update user: {:?}", err);
+                return Err(UserCreationError::DatabaseError);
+            }
+        }
     }
 
     pub fn delete(conn: &mut SqliteConnection, user_id: i32) -> QueryResult<usize> {
         use crate::schema::users::dsl::*;
+
+        log::info!("Deleting user (id={:?})", user_id);
         diesel::delete(users.filter(id.eq(user_id))).execute(conn)
     }
 
-    fn hash_password(password: &str) -> Result<String, diesel::result::Error> {
+    fn hash_password(password: &str) -> Result<String, UserCreationError> {
         if password.len() < 1 {
-            return Err(diesel::result::Error::RollbackTransaction);
+            return Err(UserCreationError::PasswordTooShort);
         }
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
         argon2
             .hash_password(password.as_bytes(), &salt)
             .map(|hash| hash.to_string())
-            .map_err(|_| diesel::result::Error::RollbackTransaction)
+            .map_err(|_| UserCreationError::PasswordHashError)
     }
 }
 
@@ -120,7 +188,6 @@ impl User {
 mod tests {
     use super::*;
     use crate::test_helpers::test_helpers::get_test_db_connection;
-    use diesel::result::Error;
 
     #[test]
     fn test_create_user() {
@@ -139,7 +206,10 @@ mod tests {
 
         let result = User::create(&mut conn, &new_user);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), Error::RollbackTransaction);
+        assert!(matches!(
+            result.unwrap_err(),
+            UserCreationError::EmailExists
+        ));
 
         let user = User::get(&mut conn, UserQuery::Email(new_user.email.clone())).unwrap();
         assert_eq!(user.login_email, new_user.email);
@@ -175,28 +245,29 @@ mod tests {
         let result = User::create(&mut conn, &new_user);
         assert!(result.is_ok());
 
-        let user = User::get(&mut conn, UserQuery::Email(new_user.email.clone())).unwrap();
-        assert_eq!(user.login_email, new_user.email);
-        assert_eq!(user.send_email, new_user.email);
-        assert_ne!(user.password, new_user.password);
-        assert_eq!(user.is_active, true);
-        assert_eq!(user.roles, "user");
+        let existing_user = User::get(&mut conn, UserQuery::Email(new_user.email.clone())).unwrap();
+        assert_eq!(existing_user.login_email, new_user.email);
+        assert_eq!(existing_user.send_email, new_user.email);
+        assert_ne!(existing_user.password, new_user.password);
+        assert_eq!(existing_user.is_active, true);
+        assert_eq!(existing_user.roles, "user");
 
-        let user = User {
-            id: user.id,
-            login_email: "myNewEmail@ok.yup".into(),
-            send_email: "test@me.com".into(),
-            password: "password".into(),
-            created_at: user.created_at,
-            is_active: user.is_active,
-            daily_send_time: user.daily_send_time,
-            roles: user.roles,
+        let user = PartialUser {
+            login_email: Some("myNewEmail@ok.yup".into()),
+            send_email: Some("test@me.com".into()),
+            is_active: None,
+            roles: None,
+            daily_send_time: None,
         };
 
-        let result = User::update(&mut conn, &user);
+        let result = User::update(&mut conn, existing_user.id.unwrap(), &user);
         assert!(result.is_ok());
 
-        let user = User::get(&mut conn, UserQuery::Email(user.login_email.clone())).unwrap();
+        let user = User::get(
+            &mut conn,
+            UserQuery::Email(user.login_email.unwrap().clone()),
+        )
+        .unwrap();
         assert_eq!(user.login_email, "myNewEmail@ok.yup");
         assert_eq!(user.send_email, "test@me.com");
         assert_ne!(user.password, "password");
