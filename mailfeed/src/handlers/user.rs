@@ -1,4 +1,4 @@
-use crate::models::user::{NewUser, PartialUser, User, UserCreationError, UserQuery};
+use crate::models::user::{NewUser, PartialUser, User, UserQuery, UserTableError};
 use crate::DbPool;
 use actix_web::{web, HttpResponse, Responder};
 use serde::Deserialize;
@@ -8,8 +8,17 @@ pub struct UserPath {
     id: String,
 }
 
-pub async fn get_all_users() -> impl Responder {
-    HttpResponse::Ok().body("get_all_users")
+pub async fn get_all_users(pool: web::Data<DbPool>) -> impl Responder {
+    let mut conn = pool.get().expect("couldn't get db connection from pool");
+    let users_result = User::get_all(&mut conn);
+
+    match users_result {
+        Ok(users) => {
+            let users_json = serde_json::to_string(&users).unwrap();
+            HttpResponse::Ok().body(users_json)
+        }
+        Err(_) => HttpResponse::InternalServerError().body("Error getting users"),
+    }
 }
 
 pub async fn create_user(pool: web::Data<DbPool>, new_user: web::Json<NewUser>) -> impl Responder {
@@ -23,8 +32,8 @@ pub async fn create_user(pool: web::Data<DbPool>, new_user: web::Json<NewUser>) 
             let user_json = serde_json::to_string(&user).unwrap();
             HttpResponse::Ok().body(user_json)
         }
-        Err(UserCreationError::EmailExists) => HttpResponse::BadRequest().body("Email exists"),
-        Err(UserCreationError::PasswordTooShort) => {
+        Err(UserTableError::EmailExists) => HttpResponse::BadRequest().body("Email exists"),
+        Err(UserTableError::PasswordTooShort) => {
             HttpResponse::BadRequest().body("Password too short")
         }
         Err(_) => HttpResponse::InternalServerError().body("Error creating user"),
@@ -34,14 +43,23 @@ pub async fn create_user(pool: web::Data<DbPool>, new_user: web::Json<NewUser>) 
 pub async fn get_user(pool: web::Data<DbPool>, path: web::Path<UserPath>) -> impl Responder {
     let id = path.id.parse::<i32>();
 
-    match id {
-        Ok(id) => {
-            let mut conn = pool.get().expect("couldn't get db connection from pool");
-            let user = User::get(&mut conn, UserQuery::Id(id)).unwrap();
+    if let Err(_) = id {
+        return HttpResponse::BadRequest().body("Invalid user ID");
+    }
+    let id = id.unwrap();
+
+    let mut conn = pool.get().expect("couldn't get db connection from pool");
+    let user = User::get(&mut conn, UserQuery::Id(id));
+
+    match user {
+        Some(user) => {
             let user_json = serde_json::to_string(&user).unwrap();
             HttpResponse::Ok().body(user_json)
         }
-        Err(_) => HttpResponse::BadRequest().body("Invalid user ID"),
+        None => {
+            log::warn!("Requested non-existent user with ID {}", id);
+            HttpResponse::NotFound().body("User not found")
+        }
     }
 }
 
@@ -64,6 +82,29 @@ pub async fn update_user(
     }
 }
 
-pub async fn delete_user() -> impl Responder {
-    HttpResponse::Ok().body("delete_user")
+pub async fn delete_user(pool: web::Data<DbPool>, path: web::Path<UserPath>) -> impl Responder {
+    let id = path.id.parse::<i32>();
+
+    match id {
+        Ok(id) => {
+            let mut conn = pool.get().expect("couldn't get db connection from pool");
+
+            let delete_result = User::delete(&mut conn, id);
+
+            match delete_result {
+                Ok(_) => {
+                    log::info!("Deleted user with ID {}", id);
+                    HttpResponse::Ok().body("User deleted")
+                }
+                Err(err) => {
+                    log::error!("Error deleting user: {:?}", err);
+                    if let UserTableError::UserNotFound = err {
+                        return HttpResponse::NotFound().body("User not found");
+                    }
+                    HttpResponse::InternalServerError().body("Error deleting user")
+                }
+            }
+        }
+        Err(_) => HttpResponse::BadRequest().body("Invalid user ID"),
+    }
 }

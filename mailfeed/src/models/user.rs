@@ -1,4 +1,5 @@
 use crate::schema::*;
+use actix_web::web::delete;
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
@@ -37,7 +38,8 @@ pub struct NewUser {
 }
 
 #[derive(Debug, Deserialize)]
-pub enum UserCreationError {
+pub enum UserTableError {
+    UserNotFound,
     EmailExists,
     PasswordHashError,
     PasswordTooShort,
@@ -54,7 +56,7 @@ impl User {
     pub fn create<'a>(
         conn: &mut SqliteConnection,
         new_user: &'a NewUser,
-    ) -> Result<User, UserCreationError> {
+    ) -> Result<User, UserTableError> {
         use crate::schema::users::dsl::*;
         let user_exists = users
             .filter(login_email.eq(&new_user.email))
@@ -63,18 +65,18 @@ impl User {
 
         if user_exists {
             log::warn!("User with email {} already exists", new_user.email);
-            return Err(UserCreationError::EmailExists);
+            return Err(UserTableError::EmailExists);
         }
 
         let password_hash = match Self::hash_password(&new_user.password) {
             Ok(hash) => hash,
-            Err(UserCreationError::PasswordTooShort) => {
+            Err(UserTableError::PasswordTooShort) => {
                 log::warn!("Password too short");
-                return Err(UserCreationError::PasswordTooShort);
+                return Err(UserTableError::PasswordTooShort);
             }
             Err(_) => {
                 log::error!("Failed to hash password");
-                return Err(UserCreationError::PasswordHashError);
+                return Err(UserTableError::PasswordHashError);
             }
         };
 
@@ -96,7 +98,7 @@ impl User {
             Ok(_) => Ok(user),
             Err(err) => {
                 log::error!("Failed to insert user into database: {:?}", err);
-                Err(UserCreationError::DatabaseError)
+                Err(UserTableError::DatabaseError)
             }
         }?;
 
@@ -107,7 +109,7 @@ impl User {
             Ok(user) => user,
             Err(err) => {
                 log::error!("Failed to get user from database: {:?}", err);
-                return Err(UserCreationError::DatabaseError);
+                return Err(UserTableError::DatabaseError);
             }
         };
 
@@ -131,11 +133,20 @@ impl User {
         }
     }
 
+    pub fn get_all(conn: &mut SqliteConnection) -> Result<Vec<User>, UserTableError> {
+        use crate::schema::users::dsl::*;
+        log::info!("Getting all users");
+        users.load::<User>(conn).map_err(|err| {
+            log::error!("Failed to get users: {:?}", err);
+            UserTableError::DatabaseError
+        })
+    }
+
     pub fn update(
         conn: &mut SqliteConnection,
         user_id: i32,
         updates: &PartialUser,
-    ) -> Result<User, UserCreationError> {
+    ) -> Result<User, UserTableError> {
         use crate::schema::users::dsl::*;
 
         let updates = updates.clone();
@@ -147,7 +158,7 @@ impl User {
                     "User with email {} already exists",
                     updates.login_email.clone().unwrap()
                 );
-                return Err(UserCreationError::EmailExists);
+                return Err(UserTableError::EmailExists);
             }
         }
         log::info!("Updating user (id={:?}): {:?}", user_id, updates);
@@ -159,28 +170,41 @@ impl User {
             Ok(user) => Ok(user),
             Err(err) => {
                 log::error!("Failed to update user: {:?}", err);
-                return Err(UserCreationError::DatabaseError);
+                return Err(UserTableError::DatabaseError);
             }
         }
     }
 
-    pub fn delete(conn: &mut SqliteConnection, user_id: i32) -> QueryResult<usize> {
+    pub fn delete(conn: &mut SqliteConnection, user_id: i32) -> Result<(), UserTableError> {
         use crate::schema::users::dsl::*;
+        log::info!("Deleting user (id={})", user_id);
 
-        log::info!("Deleting user (id={:?})", user_id);
-        diesel::delete(users.filter(id.eq(user_id))).execute(conn)
+        let deleted_rows = diesel::delete(users.filter(id.eq(user_id)))
+            .execute(conn)
+            .map_err(|err| {
+                log::error!("Failed to delete user: {:?}", err);
+                UserTableError::DatabaseError
+            })
+            .ok();
+
+        if deleted_rows == Some(0) {
+            log::warn!("User with id {} does not exist", user_id);
+            return Err(UserTableError::UserNotFound);
+        } else {
+            return Ok(());
+        }
     }
 
-    fn hash_password(password: &str) -> Result<String, UserCreationError> {
+    fn hash_password(password: &str) -> Result<String, UserTableError> {
         if password.len() < 1 {
-            return Err(UserCreationError::PasswordTooShort);
+            return Err(UserTableError::PasswordTooShort);
         }
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
         argon2
             .hash_password(password.as_bytes(), &salt)
             .map(|hash| hash.to_string())
-            .map_err(|_| UserCreationError::PasswordHashError)
+            .map_err(|_| UserTableError::PasswordHashError)
     }
 }
 
@@ -206,10 +230,7 @@ mod tests {
 
         let result = User::create(&mut conn, &new_user);
         assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            UserCreationError::EmailExists
-        ));
+        assert!(matches!(result.unwrap_err(), UserTableError::EmailExists));
 
         let user = User::get(&mut conn, UserQuery::Email(new_user.email.clone())).unwrap();
         assert_eq!(user.login_email, new_user.email);

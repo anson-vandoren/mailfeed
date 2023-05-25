@@ -1,9 +1,8 @@
 #[cfg(test)]
 pub mod test_helpers {
-
+    use crate::MIGRATIONS;
     use diesel::{Connection, SqliteConnection};
-    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-    pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/db/migrations");
+    use diesel_migrations::MigrationHarness;
 
     pub fn get_test_db_connection() -> SqliteConnection {
         let mut conn = SqliteConnection::establish(":memory:")

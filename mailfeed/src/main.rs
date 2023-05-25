@@ -13,8 +13,12 @@ use diesel::{
     prelude::*,
     r2d2::{self, ConnectionManager, Pool},
 };
+use diesel_migrations::MigrationHarness;
+use diesel_migrations::{embed_migrations, EmbeddedMigrations};
 use dotenvy::dotenv;
 use std::env;
+
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/db/migrations");
 
 fn main() -> std::io::Result<()> {
     dotenv().ok();
@@ -24,6 +28,11 @@ fn main() -> std::io::Result<()> {
 
     let db_pool = initialize_db_pool(config.db_path);
     // TODO: Run migrations
+    log::info!("Running database migrations");
+    let mut conn = db_pool.get().expect("Failed to get database connection");
+    conn.run_pending_migrations(MIGRATIONS)
+        .expect("Failed to run migrations");
+
     // TODO: if no user, prompt to create one
 
     run_server(config.public_path, db_pool, config.port)
