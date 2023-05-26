@@ -44,6 +44,14 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                     .route(
                         "/password-reset",
                         web::post().to(handlers::auth::password_reset),
+                    )
+                    .route(
+                        "/password-reset/{token}",
+                        web::post().to(handlers::auth::password_reset_confirm),
+                    )
+                    .route(
+                        "/change_password",
+                        web::post().to(handlers::auth::change_password),
                     ),
             )
             .service(

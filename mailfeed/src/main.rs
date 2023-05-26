@@ -27,7 +27,6 @@ fn main() -> std::io::Result<()> {
     let config = load_config();
 
     let db_pool = initialize_db_pool(config.db_path);
-    // TODO: Run migrations
     log::info!("Running database migrations");
     let mut conn = db_pool.get().expect("Failed to get database connection");
     conn.run_pending_migrations(MIGRATIONS)

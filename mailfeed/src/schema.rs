@@ -27,6 +27,17 @@ diesel::table! {
 }
 
 diesel::table! {
+    settings (id) {
+        id -> Nullable<Integer>,
+        user_id -> Nullable<Integer>,
+        key -> Text,
+        value -> Text,
+        created_at -> Integer,
+        updated_at -> Integer,
+    }
+}
+
+diesel::table! {
     subscriptions (id) {
         id -> Nullable<Integer>,
         user_id -> Integer,
@@ -59,6 +70,7 @@ diesel::joinable!(subscriptions -> users (user_id));
 diesel::allow_tables_to_appear_in_same_query!(
     feed_items,
     feeds,
+    settings,
     subscriptions,
     users,
 );

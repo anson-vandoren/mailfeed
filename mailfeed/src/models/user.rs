@@ -31,6 +31,16 @@ pub struct PartialUser {
     pub roles: Option<String>,           // CSV
 }
 
+impl PartialUser {
+    pub fn is_empty(&self) -> bool {
+        self.login_email.is_none()
+            && self.send_email.is_none()
+            && self.is_active.is_none()
+            && self.daily_send_time.is_none()
+            && self.roles.is_none()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewUser {
     pub email: String,

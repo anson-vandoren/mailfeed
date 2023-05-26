@@ -68,13 +68,27 @@ pub async fn update_user(
     path: web::Path<UserPath>,
     updates: web::Json<PartialUser>,
 ) -> impl Responder {
+    // if none of the fields are set, return a bad request
+    if updates.is_empty() {
+        return HttpResponse::BadRequest().body("No fields to update");
+    }
     let id = path.id.parse::<i32>();
 
     match id {
         Ok(id) => {
             let mut conn = pool.get().expect("couldn't get db connection from pool");
 
-            let updated_user = User::update(&mut conn, id, &updates).unwrap();
+            let updated_user = match User::update(&mut conn, id, &updates) {
+                Ok(_) => (),
+                Err(UserTableError::EmailExists) => {
+                    return HttpResponse::BadRequest().body("Email exists")
+                }
+                Err(UserTableError::PasswordTooShort) => {
+                    return HttpResponse::BadRequest().body("Password too short")
+                }
+                Err(_) => return HttpResponse::InternalServerError().body("Error updating user"),
+            };
+
             let user_json = serde_json::to_string(&updated_user).unwrap();
             HttpResponse::Ok().body(user_json)
         }
