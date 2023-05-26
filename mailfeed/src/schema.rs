@@ -67,10 +67,4 @@ diesel::joinable!(feed_items -> feeds (feed_id));
 diesel::joinable!(subscriptions -> feeds (feed_id));
 diesel::joinable!(subscriptions -> users (user_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    feed_items,
-    feeds,
-    settings,
-    subscriptions,
-    users,
-);
+diesel::allow_tables_to_appear_in_same_query!(feed_items, feeds, settings, subscriptions, users,);

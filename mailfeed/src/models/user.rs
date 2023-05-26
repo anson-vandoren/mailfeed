@@ -1,7 +1,6 @@
 use crate::schema::*;
-use actix_web::web::delete;
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2,
 };
 use diesel::{associations::HasTable, prelude::*};
@@ -101,6 +100,7 @@ impl User {
             roles: "user".into(),
         };
 
+        // TODO: use .get_result() here
         match diesel::insert_into(users::table())
             .values(&user)
             .execute(conn)

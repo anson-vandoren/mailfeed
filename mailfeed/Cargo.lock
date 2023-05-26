@@ -927,8 +927,10 @@ dependencies = [
  "env_logger",
  "jsonwebtoken",
  "log",
+ "rand",
  "serde",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
