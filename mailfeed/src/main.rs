@@ -1,11 +1,13 @@
 extern crate diesel;
 
+mod global;
 mod handlers;
 mod models;
 mod routes;
 mod schema;
 mod test_helpers;
 
+use crate::global::init_jwt_secret;
 use crate::routes::configure;
 use actix_files::Files;
 use actix_web::{middleware, web, App, HttpServer};
@@ -27,6 +29,8 @@ fn main() -> std::io::Result<()> {
     let config = load_config();
 
     let db_pool = initialize_db_pool(config.db_path);
+    let mut conn = db_pool.get().expect("Failed to get database connection");
+    init_jwt_secret(&mut conn);
     log::info!("Running database migrations");
     let mut conn = db_pool.get().expect("Failed to get database connection");
     conn.run_pending_migrations(MIGRATIONS)

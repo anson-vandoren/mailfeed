@@ -1,3 +1,4 @@
+use crate::global::JWT_SECRET;
 use crate::models::user::{PartialUser, User, UserQuery};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use chrono::{Duration, Utc};
@@ -18,13 +19,24 @@ pub struct LoginRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct LoginResponse {
+pub struct TokenResponse {
     pub access_token: String,
     pub refresh_token: String,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RefreshRequest {
+    pub refresh_token: String,
+}
+
 pub async fn login(pool: web::Data<DbPool>, login_req: web::Json<LoginRequest>) -> impl Responder {
-    let mut conn = pool.get().expect("couldn't get db connection from pool");
+    let mut conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(err) => {
+            log::error!("Failed to get db connection from pool: {}", err);
+            return HttpResponse::InternalServerError().body("Error connecting to database");
+        }
+    };
 
     let user = match User::get(&mut conn, UserQuery::Email(login_req.email.clone())) {
         Some(user) => user,
@@ -60,7 +72,7 @@ pub async fn login(pool: web::Data<DbPool>, login_req: web::Json<LoginRequest>) 
         return HttpResponse::InternalServerError().body("Error updating user");
     }
 
-    let response = LoginResponse {
+    let response = TokenResponse {
         access_token,
         refresh_token,
     };
@@ -69,17 +81,15 @@ pub async fn login(pool: web::Data<DbPool>, login_req: web::Json<LoginRequest>) 
 }
 
 pub async fn logout(pool: web::Data<DbPool>, req: HttpRequest) -> impl Responder {
-    let mut conn = pool.get().expect("couldn't get db connection from pool");
+    let mut conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(err) => {
+            log::error!("Failed to get db connection from pool: {}", err);
+            return HttpResponse::InternalServerError().body("Error connecting to database");
+        }
+    };
 
-    let auth_header = req.headers().get("Authorization");
-    if auth_header.is_none() {
-        return HttpResponse::BadRequest().body("No Authorization header");
-    }
-
-    let auth_header = auth_header.unwrap();
-    let auth_header = auth_header.to_str().unwrap();
-
-    let claims = verify_and_extract_claims(&mut conn, auth_header);
+    let claims = verified_claims_from_req(&mut conn, &req);
 
     if claims.is_none() {
         return HttpResponse::Unauthorized().body("Invalid token");
@@ -95,6 +105,44 @@ pub async fn logout(pool: web::Data<DbPool>, req: HttpRequest) -> impl Responder
     HttpResponse::Ok().body("logout successful")
 }
 
+pub async fn refresh(
+    pool: web::Data<DbPool>,
+    refresh_req: web::Json<RefreshRequest>,
+) -> impl Responder {
+    let mut conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(err) => {
+            log::error!("Failed to get db connection from pool: {}", err);
+            return HttpResponse::InternalServerError().body("Error connecting to database");
+        }
+    };
+
+    let claims = verify_and_extract_claims(&mut conn, &refresh_req.refresh_token);
+
+    if claims.is_none() {
+        return HttpResponse::Unauthorized().body("Invalid refresh token");
+    }
+
+    let claims = claims.unwrap();
+
+    let user = match User::get(&mut conn, UserQuery::Email(claims.sub.clone())) {
+        Some(user) => user,
+        None => return HttpResponse::Unauthorized().body("Invalid refresh token"),
+    };
+
+    let new_access_token = match create_access_token(&mut conn, &user.login_email, &user.role) {
+        Ok(token) => token,
+        Err(_) => return HttpResponse::InternalServerError().body("Error creating access token"),
+    };
+
+    let response = TokenResponse {
+        access_token: new_access_token,
+        refresh_token: refresh_req.refresh_token.clone(),
+    };
+
+    HttpResponse::Ok().json(response)
+}
+
 pub async fn password_reset() -> impl Responder {
     HttpResponse::Ok().body("password_reset")
 }
@@ -108,8 +156,8 @@ pub async fn change_password() -> impl Responder {
 }
 
 const BEARER: &str = "Bearer ";
-const JWT_DURATION_SECONDS: i64 = 60 * 60; // 1 hour
-const REFRESH_DURATION_SECONDS: i64 = 60 * 60 * 24 * 7; // 70 days
+const JWT_DURATION_SECONDS: i64 = 60 * 15; // 15 minutes
+const REFRESH_DURATION_SECONDS: i64 = 60 * 60 * 24 * 7; // 7 days
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -194,6 +242,18 @@ fn verify_and_extract_claims(conn: &mut SqliteConnection, header_val: &str) -> O
     decode::<Claims>(token, &DecodingKey::from_secret(&jwt_secret), &validation)
         .map(|data| data.claims)
         .ok()
+}
+
+fn verified_claims_from_req(conn: &mut SqliteConnection, req: &HttpRequest) -> Option<Claims> {
+    let auth_header = req.headers().get("Authorization");
+    if auth_header.is_none() {
+        return None;
+    }
+
+    let auth_header = auth_header.unwrap();
+    let auth_header = auth_header.to_str().unwrap();
+
+    verify_and_extract_claims(conn, auth_header)
 }
 
 fn get_jwt_secret(conn: &mut SqliteConnection) -> Option<String> {

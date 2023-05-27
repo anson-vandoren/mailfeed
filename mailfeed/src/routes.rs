@@ -41,6 +41,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                 web::scope("/auth")
                     .route("/login", web::post().to(handlers::auth::login))
                     .route("/logout", web::post().to(handlers::auth::logout))
+                    .route("/refresh", web::post().to(handlers::auth::refresh))
                     .route(
                         "/password-reset",
                         web::post().to(handlers::auth::password_reset),
