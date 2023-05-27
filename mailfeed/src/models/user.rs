@@ -1,7 +1,7 @@
 use crate::schema::*;
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
-    Argon2,
+    Argon2, PasswordHash, PasswordVerifier,
 };
 use diesel::{associations::HasTable, prelude::*};
 use serde::{Deserialize, Serialize};
@@ -215,6 +215,22 @@ impl User {
             .hash_password(password.as_bytes(), &salt)
             .map(|hash| hash.to_string())
             .map_err(|_| UserTableError::PasswordHashError)
+    }
+
+    pub fn check_password(user: &User, password: &str) -> Result<bool, UserTableError> {
+        let argon2 = Argon2::default();
+        let password_hash = PasswordHash::new(&user.password).map_err(|_| {
+            log::error!("Failed to parse password hash");
+            UserTableError::PasswordHashError
+        })?;
+        let result = argon2
+            .verify_password(password.as_bytes(), &password_hash)
+            .map_err(|_| {
+                log::error!("Failed to verify password");
+                UserTableError::PasswordHashError
+            })
+            .is_ok();
+        Ok(result)
     }
 }
 
