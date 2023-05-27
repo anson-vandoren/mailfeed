@@ -929,6 +929,7 @@ dependencies = [
  "actix-files",
  "actix-web",
  "argon2",
+ "base64 0.21.2",
  "chrono",
  "diesel",
  "diesel_migrations",

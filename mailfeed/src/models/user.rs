@@ -17,7 +17,8 @@ pub struct User {
     pub created_at: i32,
     pub is_active: bool,
     pub daily_send_time: String, // HH:MM+HH:MM
-    pub roles: String,           // CSV
+    pub role: String,            // CSV
+    pub refresh_token: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, AsChangeset)]
@@ -27,7 +28,8 @@ pub struct PartialUser {
     pub send_email: Option<String>,
     pub is_active: Option<bool>,
     pub daily_send_time: Option<String>, // HH:MM+HH:MM
-    pub roles: Option<String>,           // CSV
+    pub role: Option<String>,            // CSV
+    pub refresh_token: Option<String>,
 }
 
 impl PartialUser {
@@ -36,7 +38,20 @@ impl PartialUser {
             && self.send_email.is_none()
             && self.is_active.is_none()
             && self.daily_send_time.is_none()
-            && self.roles.is_none()
+            && self.role.is_none()
+    }
+}
+
+impl Default for PartialUser {
+    fn default() -> Self {
+        Self {
+            login_email: None,
+            send_email: None,
+            is_active: None,
+            daily_send_time: None,
+            role: None,
+            refresh_token: None,
+        }
     }
 }
 
@@ -97,7 +112,8 @@ impl User {
             created_at: chrono::Utc::now().timestamp() as i32,
             is_active: true,
             daily_send_time: "00:00+00:00".into(),
-            roles: "user".into(),
+            role: "user".into(),
+            refresh_token: None,
         };
 
         // TODO: use .get_result() here
@@ -159,15 +175,10 @@ impl User {
     ) -> Result<User, UserTableError> {
         use crate::schema::users::dsl::*;
 
-        let updates = updates.clone();
-
-        if updates.login_email.is_some() {
-            let user_exists = User::exists(conn, &updates.login_email.clone().unwrap());
+        if let Some(update_email) = &updates.login_email {
+            let user_exists = User::exists(conn, update_email);
             if user_exists {
-                log::warn!(
-                    "User with email {} already exists",
-                    updates.login_email.clone().unwrap()
-                );
+                log::warn!("User with email {} already exists", update_email);
                 return Err(UserTableError::EmailExists);
             }
         }
@@ -181,6 +192,32 @@ impl User {
             Err(err) => {
                 log::error!("Failed to update user: {:?}", err);
                 return Err(UserTableError::DatabaseError);
+            }
+        }
+    }
+
+    pub fn clear_refresh_token(
+        conn: &mut SqliteConnection,
+        user_id: UserQuery,
+    ) -> Result<(), UserTableError> {
+        use crate::schema::users::dsl::*;
+
+        log::info!("Clearing refresh token for user: {:?}", user_id);
+
+        let res = match user_id {
+            UserQuery::Id(user_id) => diesel::update(users.filter(id.eq(user_id)))
+                .set(refresh_token.eq(None::<String>))
+                .execute(conn),
+            UserQuery::Email(email) => diesel::update(users.filter(login_email.eq(email)))
+                .set(refresh_token.eq(None::<String>))
+                .execute(conn),
+        };
+
+        match res {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                log::error!("Failed to clear refresh token: {:?}", err);
+                Err(UserTableError::DatabaseError)
             }
         }
     }
@@ -263,7 +300,7 @@ mod tests {
         assert_eq!(user.send_email, new_user.email);
         assert_ne!(user.password, new_user.password);
         assert_eq!(user.is_active, true);
-        assert_eq!(user.roles, "user");
+        assert_eq!(user.role, "user");
     }
 
     #[test]
@@ -297,14 +334,15 @@ mod tests {
         assert_eq!(existing_user.send_email, new_user.email);
         assert_ne!(existing_user.password, new_user.password);
         assert_eq!(existing_user.is_active, true);
-        assert_eq!(existing_user.roles, "user");
+        assert_eq!(existing_user.role, "user");
 
         let user = PartialUser {
             login_email: Some("myNewEmail@ok.yup".into()),
             send_email: Some("test@me.com".into()),
-            is_active: None,
-            roles: None,
+            is_active: Some(true),
+            role: None,
             daily_send_time: None,
+            refresh_token: Some("some refresh token".into()),
         };
 
         let result = User::update(&mut conn, existing_user.id.unwrap(), &user);
@@ -319,7 +357,7 @@ mod tests {
         assert_eq!(user.send_email, "test@me.com");
         assert_ne!(user.password, "password");
         assert_eq!(user.is_active, true);
-        assert_eq!(user.roles, "user");
+        assert_eq!(user.role, "user");
     }
 
     #[test]

@@ -59,7 +59,8 @@ diesel::table! {
         created_at -> Integer,
         is_active -> Bool,
         daily_send_time -> Text,
-        roles -> Text,
+        role -> Text,
+        refresh_token -> Nullable<Text>,
     }
 }
 
