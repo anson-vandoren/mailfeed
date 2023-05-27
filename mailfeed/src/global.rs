@@ -45,3 +45,38 @@ fn generate_jwt_secret() -> String {
         .map(char::from)
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_helpers::test_helpers::get_test_db_connection;
+
+    use super::*;
+
+    #[test]
+    fn test_creates_jwt_secret_if_not_exists() {
+        let mut conn = get_test_db_connection();
+        let secret = get_jwt_secret(&mut conn);
+        assert_ne!(secret, None);
+        assert!(secret.unwrap().len() > 0);
+    }
+
+    #[test]
+    fn test_same_secret_returned_if_exists() {
+        let mut conn = get_test_db_connection();
+        let secret = get_jwt_secret(&mut conn);
+        let secret2 = get_jwt_secret(&mut conn);
+        assert_eq!(secret, secret2);
+    }
+
+    #[test]
+    fn test_secret_has_no_user_id() {
+        let mut conn = get_test_db_connection();
+        let secret = get_jwt_secret(&mut conn);
+        assert_ne!(secret, None);
+
+        let res = Setting::get(&mut conn, "jwt_secret", None);
+        assert!(!res.is_err());
+        let setting = res.unwrap();
+        assert_eq!(setting.user_id, None);
+    }
+}
