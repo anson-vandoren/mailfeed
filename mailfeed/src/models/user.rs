@@ -18,6 +18,7 @@ pub struct User {
     pub is_active: bool,
     pub daily_send_time: String, // HH:MM+HH:MM
     pub role: String,            // CSV
+    #[serde(skip_serializing)]
     pub refresh_token: Option<String>,
 }
 
@@ -28,7 +29,8 @@ pub struct PartialUser {
     pub send_email: Option<String>,
     pub is_active: Option<bool>,
     pub daily_send_time: Option<String>, // HH:MM+HH:MM
-    pub role: Option<String>,            // CSV
+    pub role: Option<String>,
+    #[serde(skip_deserializing)]
     pub refresh_token: Option<String>,
 }
 
@@ -71,9 +73,9 @@ pub enum UserTableError {
 }
 
 #[derive(Debug)]
-pub enum UserQuery {
+pub enum UserQuery<'a> {
     Id(i32),
-    Email(String),
+    Email(&'a str),
 }
 
 impl User {
@@ -82,6 +84,7 @@ impl User {
         new_user: &'a NewUser,
     ) -> Result<User, UserTableError> {
         use crate::schema::users::dsl::*;
+        // TODO: only admin can create new users
         let user_exists = users
             .filter(login_email.eq(&new_user.email))
             .first::<User>(conn)
@@ -182,7 +185,7 @@ impl User {
                 return Err(UserTableError::EmailExists);
             }
         }
-        log::info!("Updating user (id={:?}): {:?}", user_id, updates);
+        log::info!("Updating user (id={:?})", user_id);
 
         match diesel::update(users.filter(id.eq(user_id)))
             .set(updates)
@@ -295,7 +298,7 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), UserTableError::EmailExists));
 
-        let user = User::get(&mut conn, UserQuery::Email(new_user.email.clone())).unwrap();
+        let user = User::get(&mut conn, UserQuery::Email(&new_user.email)).unwrap();
         assert_eq!(user.login_email, new_user.email);
         assert_eq!(user.send_email, new_user.email);
         assert_ne!(user.password, new_user.password);
@@ -314,7 +317,7 @@ mod tests {
         let result = User::create(&mut conn, &new_user);
         assert!(result.is_err());
 
-        let user = User::get(&mut conn, UserQuery::Email(new_user.email.clone()));
+        let user = User::get(&mut conn, UserQuery::Email(&new_user.email));
         assert!(user.is_none());
     }
 
@@ -329,7 +332,7 @@ mod tests {
         let result = User::create(&mut conn, &new_user);
         assert!(result.is_ok());
 
-        let existing_user = User::get(&mut conn, UserQuery::Email(new_user.email.clone())).unwrap();
+        let existing_user = User::get(&mut conn, UserQuery::Email(&new_user.email)).unwrap();
         assert_eq!(existing_user.login_email, new_user.email);
         assert_eq!(existing_user.send_email, new_user.email);
         assert_ne!(existing_user.password, new_user.password);
@@ -348,11 +351,7 @@ mod tests {
         let result = User::update(&mut conn, existing_user.id.unwrap(), &user);
         assert!(result.is_ok());
 
-        let user = User::get(
-            &mut conn,
-            UserQuery::Email(user.login_email.unwrap().clone()),
-        )
-        .unwrap();
+        let user = User::get(&mut conn, UserQuery::Email(&user.login_email.unwrap())).unwrap();
         assert_eq!(user.login_email, "myNewEmail@ok.yup");
         assert_eq!(user.send_email, "test@me.com");
         assert_ne!(user.password, "password");
@@ -371,7 +370,7 @@ mod tests {
         let result = User::create(&mut conn, &new_user);
         assert!(result.is_ok());
 
-        let user = User::get(&mut conn, UserQuery::Email(new_user.email.clone())).unwrap();
+        let user = User::get(&mut conn, UserQuery::Email(&new_user.email)).unwrap();
         assert_eq!(user.login_email, new_user.email);
 
         let result = User::delete(&mut conn, user.id.unwrap());

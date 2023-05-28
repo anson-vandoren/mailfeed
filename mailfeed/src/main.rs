@@ -1,11 +1,13 @@
 extern crate diesel;
 
+mod claims;
 mod global;
 mod handlers;
 mod models;
 mod routes;
 mod schema;
 mod test_helpers;
+mod types;
 
 use crate::global::init_jwt_secret;
 use crate::routes::configure;

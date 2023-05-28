@@ -7,7 +7,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/api")
             .service(
                 web::scope("/users")
-                    // TODO: all these routes should be protected by auth
                     .route("", web::get().to(handlers::user::get_all_users))
                     .route("", web::post().to(handlers::user::create_user))
                     .route("/{id}", web::get().to(handlers::user::get_user))
