@@ -1,10 +1,9 @@
 extern crate diesel;
 
+mod api;
 mod claims;
 mod global;
-mod handlers;
 mod models;
-mod routes;
 mod schema;
 mod test_helpers;
 mod types;
@@ -12,7 +11,6 @@ mod types;
 use crate::claims::Claims;
 use crate::global::init_jwt_secret;
 use crate::models::user::{NewUser, PartialUser, User};
-use crate::routes::configure;
 use actix_files::Files;
 use actix_web::{middleware, web, App, HttpServer};
 use chrono::Utc;
@@ -26,7 +24,7 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations};
 use dotenvy::dotenv;
 use std::env;
 
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/db/migrations");
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/migrations");
 
 /// CLI options
 #[derive(Parser, Debug)]
@@ -34,7 +32,7 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/db/migrations"
 struct Args {
     /// Create a new user
     #[clap(long)]
-    create_user: bool,
+    create_admin: bool,
 }
 
 fn main() -> std::io::Result<()> {
@@ -51,7 +49,7 @@ fn main() -> std::io::Result<()> {
     init_jwt_secret(&mut conn);
 
     let args = Args::parse();
-    if args.create_user {
+    if args.create_admin {
         cli_create_user(&mut conn);
         return Ok(());
     }
@@ -185,7 +183,7 @@ async fn run_server(
                 middleware::TrailingSlash::Trim,
             ))
             .app_data(web::Data::new(db_pool.clone()))
-            .configure(configure)
+            .service(api::routes())
             .service(Files::new("/", &public_path).index_file("index.html"))
     })
     .workers(1)
@@ -195,6 +193,7 @@ async fn run_server(
 }
 
 type DbPool = r2d2::Pool<r2d2::ConnectionManager<SqliteConnection>>;
+type RqDbPool = web::Data<DbPool>;
 fn initialize_db_pool(db_path: String) -> DbPool {
     dotenv().ok();
 

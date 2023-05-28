@@ -1,172 +1,13 @@
+use super::types::Error;
 use crate::claims::Claims;
 use crate::global::JWT_SECRET;
-use crate::models::user::{PartialUser, User, UserQuery};
-use actix_web::{web, HttpResponse, Responder};
+use crate::models::user::User;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
-
-use crate::DbPool;
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct LoginRequest {
-    pub email: String,
-    pub password: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TokenResponse<'a> {
-    pub access_token: &'a str,
-    pub refresh_token: &'a str,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct RefreshRequest {
-    pub refresh_token: String,
-}
-
-pub async fn login(pool: web::Data<DbPool>, login_req: web::Json<LoginRequest>) -> impl Responder {
-    let mut conn = match pool.get() {
-        Ok(conn) => conn,
-        Err(err) => {
-            log::error!("Failed to get db connection from pool: {}", err);
-            return HttpResponse::InternalServerError().body("Error connecting to database");
-        }
-    };
-
-    let user = match User::get(&mut conn, UserQuery::Email(&login_req.email)) {
-        Some(user) => user,
-        None => return HttpResponse::BadRequest().body("Invalid email or password"),
-    };
-
-    if user.is_active == false {
-        return HttpResponse::BadRequest().body("Account is deactivated - contact admin");
-    }
-
-    let is_password_correct = match User::check_password(&user, &login_req.password) {
-        Ok(is_correct) => is_correct,
-        Err(_) => return HttpResponse::BadRequest().body("Invalid email or password"),
-    };
-
-    if !is_password_correct {
-        return HttpResponse::BadRequest().body("Invalid email or password");
-    }
-
-    let refresh_token = match create_refresh_token(&user) {
-        Ok(token) => token,
-        Err(_) => return HttpResponse::InternalServerError().body("Error creating refresh token"),
-    };
-
-    let access_token = match create_access_token(&user) {
-        Ok(token) => token,
-        Err(_) => return HttpResponse::InternalServerError().body("Error creating access token"),
-    };
-
-    let updates = PartialUser {
-        refresh_token: Some(refresh_token.clone()),
-        ..Default::default()
-    };
-    // add refresh token to users table
-    if let Err(e) = User::update(&mut conn, user.id.unwrap(), &updates) {
-        log::error!("Error updating user: {:?}", e);
-        return HttpResponse::InternalServerError().body("Error updating user");
-    }
-
-    let response = TokenResponse {
-        access_token: &access_token,
-        refresh_token: &refresh_token,
-    };
-
-    HttpResponse::Ok().json(response)
-}
-
-pub async fn logout(pool: web::Data<DbPool>, claims: Claims) -> impl Responder {
-    log::info!("logout: {:?}", &claims.sub);
-    let mut conn = match pool.get() {
-        Ok(conn) => conn,
-        Err(err) => {
-            log::error!("Failed to get db connection from pool: {}", err);
-            return HttpResponse::InternalServerError().body("Error connecting to database");
-        }
-    };
-
-    if let Err(e) = User::clear_refresh_token(&mut conn, UserQuery::Id(claims.sub)) {
-        log::error!("Error clearing refresh token: {:?}", e);
-        return HttpResponse::InternalServerError().body("Error clearing refresh token");
-    }
-
-    HttpResponse::Ok().body("logout successful")
-}
-
-pub async fn refresh(
-    pool: web::Data<DbPool>,
-    refresh_req: web::Json<RefreshRequest>,
-) -> impl Responder {
-    let mut conn = match pool.get() {
-        Ok(conn) => conn,
-        Err(err) => {
-            log::error!("Failed to get db connection from pool: {}", err);
-            return HttpResponse::InternalServerError().body("Error connecting to database");
-        }
-    };
-
-    let claims = verify_and_extract_claims(&refresh_req.refresh_token);
-
-    if claims.is_none() {
-        return HttpResponse::Unauthorized().body("Invalid refresh token");
-    }
-
-    let claims = claims.unwrap();
-
-    let user = match User::get(&mut conn, UserQuery::Id(claims.sub)) {
-        Some(user) => user,
-        None => return HttpResponse::Unauthorized().body("Invalid refresh token"),
-    };
-
-    if user.is_active == false {
-        if let Err(e) = User::clear_refresh_token(&mut conn, UserQuery::Id(user.id.unwrap())) {
-            log::error!("Error clearing refresh token: {:?}", e);
-        }
-        return HttpResponse::BadRequest().body("Account is deactivated - contact admin");
-    }
-
-    let new_access_token = match create_access_token(&user) {
-        Ok(token) => token,
-        Err(_) => return HttpResponse::InternalServerError().body("Error creating access token"),
-    };
-
-    let response = TokenResponse {
-        access_token: &new_access_token,
-        refresh_token: &refresh_req.refresh_token,
-    };
-
-    HttpResponse::Ok().json(response)
-}
-
-pub async fn password_reset() -> impl Responder {
-    HttpResponse::Ok().body("password_reset")
-}
-
-pub async fn password_reset_confirm() -> impl Responder {
-    HttpResponse::Ok().body("password_reset_confirm")
-}
-
-pub async fn change_password() -> impl Responder {
-    HttpResponse::Ok().body("change_password")
-}
 
 const BEARER: &str = "Bearer ";
 const JWT_DURATION_SECONDS: i64 = 60 * 15; // 15 minutes
 const REFRESH_DURATION_SECONDS: i64 = 60 * 60 * 24 * 7; // 7 days
-
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("jwt creation error")]
-    JWTCreationError,
-    #[error("failed to get or create JWT secret")]
-    JWTSecretGenerationError,
-}
 
 fn create_token(user: &User, duration: i64) -> Result<String, Error> {
     let expiration = Utc::now()
@@ -196,15 +37,15 @@ fn create_token(user: &User, duration: i64) -> Result<String, Error> {
         .map_err(|_| Error::JWTCreationError)
 }
 
-fn create_access_token(user: &User) -> Result<String, Error> {
+pub fn create_access_token(user: &User) -> Result<String, Error> {
     create_token(user, JWT_DURATION_SECONDS)
 }
 
-fn create_refresh_token(user: &User) -> Result<String, Error> {
+pub fn create_refresh_token(user: &User) -> Result<String, Error> {
     create_token(user, REFRESH_DURATION_SECONDS)
 }
 
-fn verify_and_extract_claims(header_val: &str) -> Option<Claims> {
+pub fn verify_and_extract_claims(header_val: &str) -> Option<Claims> {
     let jwt_secret = match JWT_SECRET.get() {
         Some(secret) => secret.as_bytes(),
         None => return None,

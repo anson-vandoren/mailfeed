@@ -1,16 +1,12 @@
-use crate::models::user::{NewUser, PartialUser, User, UserQuery, UserTableError};
-use crate::DbPool;
-use actix_web::{web, HttpResponse, Responder};
-use serde::Deserialize;
+use super::types::{RqPartUser, RqUserId};
+use crate::models::user::{NewUser, User, UserQuery, UserTableError};
+use crate::RqDbPool;
+use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
 
 use crate::claims::Claims;
 
-#[derive(Debug, Deserialize)]
-pub struct UserPath {
-    id: String,
-}
-
-pub async fn get_all_users(pool: web::Data<DbPool>, claims: Claims) -> impl Responder {
+#[get("")]
+pub async fn get_all_users(pool: RqDbPool, claims: Claims) -> impl Responder {
     let mut conn = match pool.get() {
         Ok(conn) => conn,
         Err(err) => {
@@ -35,8 +31,9 @@ pub async fn get_all_users(pool: web::Data<DbPool>, claims: Claims) -> impl Resp
     }
 }
 
+#[post("")]
 pub async fn create_user(
-    pool: web::Data<DbPool>,
+    pool: RqDbPool,
     new_user: web::Json<NewUser>,
     claims: Claims,
 ) -> impl Responder {
@@ -64,11 +61,8 @@ pub async fn create_user(
     }
 }
 
-pub async fn get_user(
-    pool: web::Data<DbPool>,
-    path: web::Path<UserPath>,
-    claims: Claims,
-) -> impl Responder {
+#[get("/{id}")]
+pub async fn get_user(pool: RqDbPool, path: RqUserId, claims: Claims) -> impl Responder {
     let id = path.id.parse::<i32>();
 
     if let Err(_) = id {
@@ -97,10 +91,11 @@ pub async fn get_user(
     HttpResponse::Ok().body(user_json)
 }
 
+#[patch("/{id}")]
 pub async fn update_user(
-    pool: web::Data<DbPool>,
-    path: web::Path<UserPath>,
-    updates: web::Json<PartialUser>,
+    pool: RqDbPool,
+    path: RqUserId,
+    updates: RqPartUser,
     claims: Claims,
 ) -> impl Responder {
     // if none of the fields are set, return a bad request
@@ -145,11 +140,8 @@ pub async fn update_user(
     HttpResponse::Ok().body(user_json)
 }
 
-pub async fn delete_user(
-    pool: web::Data<DbPool>,
-    path: web::Path<UserPath>,
-    claims: Claims,
-) -> impl Responder {
+#[delete("/{id}")]
+pub async fn delete_user(pool: RqDbPool, path: RqUserId, claims: Claims) -> impl Responder {
     let id = match path.id.parse::<i32>() {
         Ok(id) => id,
         Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),
