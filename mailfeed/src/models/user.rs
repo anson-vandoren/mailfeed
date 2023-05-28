@@ -1,4 +1,4 @@
-use crate::schema::*;
+use crate::{claims::Claims, schema::*};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2, PasswordHash, PasswordVerifier,
@@ -70,6 +70,7 @@ pub enum UserTableError {
     PasswordHashError,
     PasswordTooShort,
     DatabaseError,
+    Unauthorized,
 }
 
 #[derive(Debug)]
@@ -82,9 +83,13 @@ impl User {
     pub fn create<'a>(
         conn: &mut SqliteConnection,
         new_user: &'a NewUser,
+        claims: Claims,
     ) -> Result<User, UserTableError> {
+        if &claims.role != "admin" {
+            log::warn!("User {} is not an admin", claims.sub);
+            return Err(UserTableError::UserNotFound);
+        }
         use crate::schema::users::dsl::*;
-        // TODO: only admin can create new users
         let user_exists = users
             .filter(login_email.eq(&new_user.email))
             .first::<User>(conn)
@@ -171,6 +176,18 @@ impl User {
         })
     }
 
+    pub fn get_all_admin(conn: &mut SqliteConnection) -> Result<Vec<User>, UserTableError> {
+        use crate::schema::users::dsl::*;
+        log::info!("Getting all admins");
+        users
+            .filter(role.eq("admin"))
+            .load::<User>(conn)
+            .map_err(|err| {
+                log::error!("Failed to get admins: {:?}", err);
+                UserTableError::DatabaseError
+            })
+    }
+
     pub fn update(
         conn: &mut SqliteConnection,
         user_id: i32,
@@ -225,9 +242,22 @@ impl User {
         }
     }
 
-    pub fn delete(conn: &mut SqliteConnection, user_id: i32) -> Result<(), UserTableError> {
+    pub fn delete(
+        conn: &mut SqliteConnection,
+        user_id: i32,
+        claims: Claims,
+    ) -> Result<(), UserTableError> {
         use crate::schema::users::dsl::*;
         log::info!("Deleting user (id={})", user_id);
+
+        if claims.role != "admin" && claims.sub != user_id {
+            log::warn!(
+                "User {} is not authorized to delete user {}",
+                claims.sub,
+                user_id
+            );
+            return Err(UserTableError::Unauthorized);
+        }
 
         let deleted_rows = diesel::delete(users.filter(id.eq(user_id)))
             .execute(conn)
@@ -276,6 +306,8 @@ impl User {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
+
     use super::*;
     use crate::test_helpers::test_helpers::get_test_db_connection;
 
@@ -287,14 +319,21 @@ mod tests {
             password: "password".into(),
         };
 
-        let result = User::create(&mut conn, &new_user);
+        let claims = Claims {
+            sub: 0,
+            email: new_user.email.clone(),
+            role: "admin".into(),
+            exp: (Utc::now().timestamp() + 1000) as usize,
+        };
+
+        let result = User::create(&mut conn, &new_user, claims.clone());
         if let Err(e) = result {
             panic!("Failed to create user: {:?}", e);
         }
 
         assert!(result.is_ok());
 
-        let result = User::create(&mut conn, &new_user);
+        let result = User::create(&mut conn, &new_user, claims);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), UserTableError::EmailExists));
 
@@ -307,6 +346,25 @@ mod tests {
     }
 
     #[test]
+    fn test_non_admin_cannot_create() {
+        let mut conn = get_test_db_connection();
+        let new_user = NewUser {
+            email: "test@me.com".into(),
+            password: "password".into(),
+        };
+
+        let claims = Claims {
+            sub: 0,
+            email: new_user.email.clone(),
+            role: "user".into(),
+            exp: (Utc::now().timestamp() + 1000) as usize,
+        };
+
+        let result = User::create(&mut conn, &new_user, claims);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_password_required() {
         let mut conn = get_test_db_connection();
         let new_user = NewUser {
@@ -314,7 +372,14 @@ mod tests {
             password: "".into(),
         };
 
-        let result = User::create(&mut conn, &new_user);
+        let claims = Claims {
+            sub: 0,
+            email: new_user.email.clone(),
+            role: "admin".into(),
+            exp: (Utc::now().timestamp() + 1000) as usize,
+        };
+
+        let result = User::create(&mut conn, &new_user, claims);
         assert!(result.is_err());
 
         let user = User::get(&mut conn, UserQuery::Email(&new_user.email));
@@ -329,7 +394,14 @@ mod tests {
             password: "password".into(),
         };
 
-        let result = User::create(&mut conn, &new_user);
+        let claims = Claims {
+            sub: 0,
+            email: new_user.email.clone(),
+            role: "admin".into(),
+            exp: (Utc::now().timestamp() + 1000) as usize,
+        };
+
+        let result = User::create(&mut conn, &new_user, claims);
         assert!(result.is_ok());
 
         let existing_user = User::get(&mut conn, UserQuery::Email(&new_user.email)).unwrap();
@@ -367,13 +439,63 @@ mod tests {
             password: "password".into(),
         };
 
-        let result = User::create(&mut conn, &new_user);
+        let claims = Claims {
+            sub: 0,
+            email: new_user.email.clone(),
+            role: "admin".into(),
+            exp: (Utc::now().timestamp() + 1000) as usize,
+        };
+
+        let result = User::create(&mut conn, &new_user, claims.clone());
         assert!(result.is_ok());
 
         let user = User::get(&mut conn, UserQuery::Email(&new_user.email)).unwrap();
         assert_eq!(user.login_email, new_user.email);
 
-        let result = User::delete(&mut conn, user.id.unwrap());
+        let result = User::delete(&mut conn, user.id.unwrap(), claims);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_non_admin_cannot_delete() {
+        let mut conn = get_test_db_connection();
+        let new_user = NewUser {
+            email: "me@test.com".into(),
+            password: "password".into(),
+        };
+
+        let claims = Claims {
+            sub: 0,
+            email: "admin".into(),
+            role: "admin".into(),
+            exp: (Utc::now().timestamp() + 1000) as usize,
+        };
+
+        let result = User::create(&mut conn, &new_user, claims);
+        assert!(result.is_ok());
+
+        let user = User::get(&mut conn, UserQuery::Email(&new_user.email)).unwrap();
+        assert_eq!(user.login_email, new_user.email);
+
+        let claims = Claims {
+            sub: 0,
+            email: new_user.email.clone(),
+            role: "user".into(),
+            exp: (Utc::now().timestamp() + 1000) as usize,
+        };
+
+        let result = User::delete(&mut conn, user.id.unwrap(), claims);
+        assert!(result.is_err());
+
+        // should be able to delete self
+        let claims = Claims {
+            sub: user.id.unwrap(),
+            email: new_user.email.clone(),
+            role: "user".into(),
+            exp: (Utc::now().timestamp() + 1000) as usize,
+        };
+
+        let result = User::delete(&mut conn, user.id.unwrap(), claims);
         assert!(result.is_ok());
     }
 }

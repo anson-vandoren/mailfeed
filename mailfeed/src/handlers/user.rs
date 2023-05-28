@@ -35,7 +35,11 @@ pub async fn get_all_users(pool: web::Data<DbPool>, claims: Claims) -> impl Resp
     }
 }
 
-pub async fn create_user(pool: web::Data<DbPool>, new_user: web::Json<NewUser>) -> impl Responder {
+pub async fn create_user(
+    pool: web::Data<DbPool>,
+    new_user: web::Json<NewUser>,
+    claims: Claims,
+) -> impl Responder {
     let mut conn = match pool.get() {
         Ok(conn) => conn,
         Err(err) => {
@@ -43,7 +47,7 @@ pub async fn create_user(pool: web::Data<DbPool>, new_user: web::Json<NewUser>) 
             return HttpResponse::InternalServerError().body("Error connecting to database");
         }
     };
-    let db_result = User::create(&mut conn, &new_user);
+    let db_result = User::create(&mut conn, &new_user, claims);
 
     match db_result {
         Ok(_) => {
@@ -141,36 +145,37 @@ pub async fn update_user(
     HttpResponse::Ok().body(user_json)
 }
 
-pub async fn delete_user(pool: web::Data<DbPool>, path: web::Path<UserPath>) -> impl Responder {
-    let id = path.id.parse::<i32>();
+pub async fn delete_user(
+    pool: web::Data<DbPool>,
+    path: web::Path<UserPath>,
+    claims: Claims,
+) -> impl Responder {
+    let id = match path.id.parse::<i32>() {
+        Ok(id) => id,
+        Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),
+    };
 
-    match id {
-        Ok(id) => {
-            let mut conn = match pool.get() {
-                Ok(conn) => conn,
-                Err(err) => {
-                    log::error!("Failed to get db connection from pool: {}", err);
-                    return HttpResponse::InternalServerError()
-                        .body("Error connecting to database");
-                }
-            };
-
-            let delete_result = User::delete(&mut conn, id);
-
-            match delete_result {
-                Ok(_) => {
-                    log::info!("Deleted user with ID {}", id);
-                    HttpResponse::Ok().body("User deleted")
-                }
-                Err(err) => {
-                    log::error!("Error deleting user: {:?}", err);
-                    if let UserTableError::UserNotFound = err {
-                        return HttpResponse::NotFound().body("User not found");
-                    }
-                    HttpResponse::InternalServerError().body("Error deleting user")
-                }
-            }
+    let mut conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(err) => {
+            log::error!("Failed to get db connection from pool: {}", err);
+            return HttpResponse::InternalServerError().body("Error connecting to database");
         }
-        Err(_) => HttpResponse::BadRequest().body("Invalid user ID"),
+    };
+
+    let delete_result = User::delete(&mut conn, id, claims);
+
+    match delete_result {
+        Ok(_) => {
+            log::info!("Deleted user with ID {}", id);
+            HttpResponse::Ok().body("User deleted")
+        }
+        Err(err) => {
+            log::error!("Error deleting user: {:?}", err);
+            if let UserTableError::UserNotFound = err {
+                return HttpResponse::NotFound().body("User not found");
+            }
+            HttpResponse::InternalServerError().body("Error deleting user")
+        }
     }
 }

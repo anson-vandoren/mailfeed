@@ -12,6 +12,7 @@ actix-web-httpauth = "0.8.0"
 argon2 = "0.5.0"
 base64 = "0.21.2"
 chrono = "0.4.24"
+clap = { version = "4.3.0", features = ["derive"] }
 derive_more = "0.99.17"
 diesel = { version = "2.0.4", features = [
   "sqlite",
@@ -25,6 +26,7 @@ jsonwebtoken = "8.3.0"
 log = "0.4.17"
 once_cell = "1.17.1"
 rand = "0.8.5"
+rpassword = "7.2.0"
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = "1.0.96"
 thiserror = "1.0.40"

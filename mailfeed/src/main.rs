@@ -9,10 +9,14 @@ mod schema;
 mod test_helpers;
 mod types;
 
+use crate::claims::Claims;
 use crate::global::init_jwt_secret;
+use crate::models::user::{NewUser, PartialUser, User};
 use crate::routes::configure;
 use actix_files::Files;
 use actix_web::{middleware, web, App, HttpServer};
+use chrono::Utc;
+use clap::Parser;
 use diesel::{
     prelude::*,
     r2d2::{self, ConnectionManager, Pool},
@@ -24,6 +28,15 @@ use std::env;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("src/db/migrations");
 
+/// CLI options
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Create a new user
+    #[clap(long)]
+    create_user: bool,
+}
+
 fn main() -> std::io::Result<()> {
     dotenv().ok();
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
@@ -31,16 +44,77 @@ fn main() -> std::io::Result<()> {
     let config = load_config();
 
     let db_pool = initialize_db_pool(config.db_path);
-    let mut conn = db_pool.get().expect("Failed to get database connection");
-    init_jwt_secret(&mut conn);
     log::info!("Running database migrations");
     let mut conn = db_pool.get().expect("Failed to get database connection");
     conn.run_pending_migrations(MIGRATIONS)
         .expect("Failed to run migrations");
+    init_jwt_secret(&mut conn);
 
-    // TODO: if no user, prompt to create one
+    let args = Args::parse();
+    if args.create_user {
+        cli_create_user(&mut conn);
+        return Ok(());
+    }
 
     run_server(config.public_path, db_pool, config.port)
+}
+
+fn cli_create_user(db: &mut SqliteConnection) -> () {
+    println!("\nEnter user login email:");
+    let mut email = String::new();
+    std::io::stdin()
+        .read_line(&mut email)
+        .expect("Failed to read email");
+    let email = email.trim();
+
+    println!("Enter password:");
+    let password = rpassword::read_password().expect("Failed to read password");
+    let password = password.trim();
+
+    println!("Enter password again:");
+    let password2 = rpassword::read_password().expect("Failed to read password");
+    let password2 = password2.trim();
+
+    if password != password2 {
+        println!("Passwords do not match");
+        return;
+    }
+
+    let new_user = NewUser {
+        email: email.to_string(),
+        password: password.to_string(),
+    };
+
+    let claims = Claims {
+        sub: 0,
+        email: "system@mailfeed".to_string(),
+        exp: (Utc::now().timestamp() + 10) as usize,
+        role: "admin".to_string(),
+    };
+
+    let user = match User::create(db, &new_user, claims) {
+        Ok(user) => user,
+        Err(e) => {
+            println!("Failed to create user: {:?}", e);
+            return;
+        }
+    };
+
+    let updates = PartialUser {
+        role: Some("admin".to_string()),
+        ..Default::default()
+    };
+
+    match User::update(db, user.id.unwrap(), &updates) {
+        Ok(user) => {
+            println!("User created successfully");
+            // print the user to stdout
+            println!("{:?}", user);
+        }
+        Err(e) => {
+            println!("Failed to update user: {:?}", e);
+        }
+    }
 }
 
 struct AppConfig {
