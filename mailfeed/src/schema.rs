@@ -2,22 +2,21 @@
 
 diesel::table! {
     feed_items (id) {
-        id -> Nullable<Integer>,
+        id -> Integer,
         feed_id -> Integer,
         title -> Text,
         link -> Text,
         pub_date -> Integer,
         description -> Nullable<Text>,
         author -> Nullable<Text>,
-        categories -> Nullable<Text>,
     }
 }
 
 diesel::table! {
     feeds (id) {
-        id -> Nullable<Integer>,
+        id -> Integer,
         url -> Text,
-        feed_type -> Text,
+        feed_type -> Integer,
         title -> Text,
         last_checked -> Integer,
         last_updated -> Integer,
@@ -39,14 +38,14 @@ diesel::table! {
 
 diesel::table! {
     subscriptions (id) {
-        id -> Nullable<Integer>,
+        id -> Integer,
         user_id -> Integer,
         friendly_name -> Text,
-        frequency -> Text,
+        frequency -> Integer,
         last_sent_time -> Integer,
         max_items -> Integer,
         is_active -> Bool,
-        feed_id -> Nullable<Integer>,
+        feed_id -> Integer,
     }
 }
 

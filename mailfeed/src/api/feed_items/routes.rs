@@ -3,6 +3,6 @@ use actix_web::{web, Scope};
 
 pub fn routes() -> Scope {
     web::scope("/feeds/{feed_id}/items")
-        .route("", web::get().to(handlers::get_all_feed_items))
-        .route("/{id}", web::get().to(handlers::get_feed_item))
+        .service(handlers::get_items_for_feed)
+        .service(handlers::get_feed_item)
 }

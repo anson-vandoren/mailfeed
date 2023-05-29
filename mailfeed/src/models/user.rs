@@ -3,7 +3,7 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2, PasswordHash, PasswordVerifier,
 };
-use diesel::{associations::HasTable, prelude::*};
+use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Identifiable, AsChangeset)]
@@ -80,6 +80,7 @@ pub enum UserQuery<'a> {
 }
 
 impl User {
+    // TODO: refactor the way the models for feed_items and feeds are
     pub fn create<'a>(
         conn: &mut SqliteConnection,
         new_user: &'a NewUser,
@@ -124,30 +125,13 @@ impl User {
             refresh_token: None,
         };
 
-        // TODO: use .get_result() here
-        match diesel::insert_into(users::table())
-            .values(&user)
-            .execute(conn)
-        {
-            Ok(_) => Ok(user),
+        match diesel::insert_into(users).values(&user).get_result(conn) {
+            Ok(in_db) => Ok(in_db),
             Err(err) => {
                 log::error!("Failed to insert user into database: {:?}", err);
                 Err(UserTableError::DatabaseError)
             }
-        }?;
-
-        let user_in_db = match users
-            .filter(login_email.eq(&new_user.email))
-            .first::<User>(conn)
-        {
-            Ok(user) => user,
-            Err(err) => {
-                log::error!("Failed to get user from database: {:?}", err);
-                return Err(UserTableError::DatabaseError);
-            }
-        };
-
-        Ok(user_in_db)
+        }
     }
 
     pub fn exists(conn: &mut SqliteConnection, email: &str) -> bool {
