@@ -91,6 +91,15 @@ pub async fn create_subscription(
         }
     };
 
+    // if the user already has a subscription to this feed, return 400
+    let user_subs = match Subscription::get_all_for_user(&mut conn, user_id) {
+        Ok(subs) => subs,
+        Err(_) => return HttpResponse::InternalServerError().body("Error getting subscriptions"),
+    };
+    if let Some(_) = user_subs.iter().find(|s| s.feed_id == feed.id) {
+        return HttpResponse::BadRequest().body("User already subscribed to this feed");
+    }
+
     let mut new_sub = NewSubscription {
         user_id,
         feed_id: feed.id,

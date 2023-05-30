@@ -2,6 +2,7 @@ extern crate diesel;
 
 mod api;
 mod claims;
+mod feed_monitor;
 mod global;
 mod models;
 mod schema;
@@ -9,6 +10,7 @@ mod test_helpers;
 mod types;
 
 use crate::claims::Claims;
+use crate::feed_monitor::orchestrator::start;
 use crate::global::init_jwt_secret;
 use crate::models::user::{NewUser, PartialUser, User};
 use actix_files::Files;
@@ -17,7 +19,7 @@ use chrono::Utc;
 use clap::Parser;
 use diesel::{
     prelude::*,
-    r2d2::{self, ConnectionManager, Pool},
+    r2d2::{self},
 };
 use diesel_migrations::MigrationHarness;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations};
@@ -167,13 +169,11 @@ fn load_config() -> AppConfig {
 }
 
 #[actix_web::main]
-async fn run_server(
-    public_path: String,
-    db_pool: Pool<ConnectionManager<SqliteConnection>>,
-    port: u16,
-) -> std::io::Result<()> {
+async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io::Result<()> {
     log::info!("Serving static files from {}", public_path);
     log::info!("Starting server at http://127.0.0.1:{}", port);
+
+    tokio::spawn(feed_monitor::start(db_pool.clone()));
 
     HttpServer::new(move || {
         App::new()
