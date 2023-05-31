@@ -10,7 +10,6 @@ mod test_helpers;
 mod types;
 
 use crate::claims::Claims;
-use crate::feed_monitor::orchestrator::start;
 use crate::global::init_jwt_secret;
 use crate::models::user::{NewUser, PartialUser, User};
 use actix_files::Files;

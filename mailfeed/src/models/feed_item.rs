@@ -20,10 +20,10 @@ pub struct FeedItem {
 #[diesel(table_name = feed_items)]
 pub struct NewFeedItem {
     pub feed_id: i32,
-    pub title: String,
-    pub link: String,
+    pub title: String, // TODO: make optional
+    pub link: String,  // TODO: add link_title
     pub pub_date: i32,
-    pub description: Option<String>,
+    pub description: Option<String>, // TODO: rename to summary
     pub author: Option<String>,
 }
 
