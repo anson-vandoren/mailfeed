@@ -5,7 +5,7 @@ use crate::models::user::PartialUser;
 
 #[derive(Debug, Deserialize)]
 pub struct UserPath {
-    pub id: String,
+    pub user_id: String,
 }
 
 pub type RqUserId = web::Path<UserPath>;

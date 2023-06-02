@@ -117,6 +117,20 @@ impl<'a> NewFeed<'a> {
     }
 }
 
+impl Default for PartialFeed {
+    fn default() -> Self {
+        PartialFeed {
+            url: None,
+            feed_type: None,
+            title: None,
+            last_checked: None,
+            last_updated: None,
+            error_time: None,
+            error_message: None,
+        }
+    }
+}
+
 impl<'a> Feed {
     pub fn new(
         url: &'a str,

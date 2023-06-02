@@ -1,6 +1,6 @@
 use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
 
-use super::types::{SubscriptionCreate, SubscriptionResponse};
+use super::types::{RqSubId, SubscriptionCreate, SubscriptionResponse};
 use crate::{
     api::users::RqUserId,
     claims::Claims,
@@ -17,7 +17,7 @@ pub async fn get_all_subscriptions(
     path: RqUserId,
     claims: Claims,
 ) -> impl Responder {
-    let user_id = match path.id.parse::<i32>() {
+    let user_id = match path.user_id.parse::<i32>() {
         Ok(id) => id,
         Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),
     };
@@ -50,7 +50,7 @@ pub async fn create_subscription(
     sub_req: web::Json<SubscriptionCreate>,
     claims: Claims,
 ) -> impl Responder {
-    let user_id = match path.id.parse::<i32>() {
+    let user_id = match path.user_id.parse::<i32>() {
         Ok(id) => id,
         Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),
     };
@@ -128,17 +128,60 @@ pub async fn create_subscription(
     HttpResponse::Ok().body(res_json)
 }
 
-#[get("/{id}")]
+#[get("/{sub_id}")]
 pub async fn get_subscription() -> impl Responder {
     HttpResponse::Ok().body("get_subscription")
 }
 
-#[patch("/{id}")]
+#[patch("/{sub_id}")]
 pub async fn update_subscription() -> impl Responder {
     HttpResponse::Ok().body("update_subscription")
 }
 
-#[delete("/{id}")]
-pub async fn delete_subscription() -> impl Responder {
-    HttpResponse::Ok().body("delete_subscription")
+#[delete("/{sub_id}")]
+pub async fn delete_subscription(
+    pool: RqDbPool,
+    user_path: RqUserId,
+    sub_path: RqSubId,
+    claims: Claims,
+) -> impl Responder {
+    let user_id = match user_path.user_id.parse::<i32>() {
+        Ok(id) => id,
+        Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),
+    };
+
+    if claims.sub != user_id {
+        return HttpResponse::Forbidden().body("Forbidden");
+    }
+
+    let sub_id = match sub_path.sub_id.parse::<i32>() {
+        Ok(id) => id,
+        Err(_) => return HttpResponse::BadRequest().body("Invalid subscription ID"),
+    };
+
+    let mut conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(err) => {
+            log::error!("Failed to get db connection from pool: {}", err);
+            return HttpResponse::InternalServerError().body("Error connecting to database");
+        }
+    };
+
+    let subscription = match Subscription::get_by_id(&mut conn, sub_id) {
+        Some(subscription) => subscription,
+        None => return HttpResponse::NotFound().body("Subscription not found"),
+    };
+
+    if subscription.user_id != user_id {
+        return HttpResponse::Forbidden().body("Forbidden");
+    }
+
+    let delete_sub_ok = Subscription::delete(&mut conn, sub_id);
+    let delete_feed_ok = Feed::delete(&mut conn, subscription.feed_id);
+
+    if !delete_sub_ok || !delete_feed_ok {
+        return HttpResponse::InternalServerError().body("Error deleting subscription");
+    }
+
+    HttpResponse::Ok().body("Subscription deleted")
 }

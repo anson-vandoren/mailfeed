@@ -2,7 +2,7 @@ use super::handlers;
 use actix_web::{web, Scope};
 
 pub fn routes() -> Scope {
-    web::scope("/users/{id}/subscriptions")
+    web::scope("/users/{user_id}/subscriptions")
         .service(handlers::get_all_subscriptions)
         .service(handlers::create_subscription)
         .service(handlers::get_subscription)

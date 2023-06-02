@@ -1,12 +1,11 @@
 use diesel::SqliteConnection;
-use feed_rs::parser;
 use tokio::{task::spawn_blocking, time::Duration};
 
 use reqwest::Client;
 
 use crate::{
     models::{
-        feed::{Feed, FeedType},
+        feed::{Feed, FeedType, PartialFeed},
         feed_item::{FeedItem, NewFeedItem},
     },
     DbPool,
@@ -16,6 +15,13 @@ pub async fn start(pool: DbPool) {
     let http_client = Client::new();
     loop {
         let mut conn = match pool.get() {
+            Ok(conn) => conn,
+            Err(e) => {
+                log::error!("Error getting DB connection: {:?}", e);
+                continue;
+            }
+        };
+        let mut update_conn = match pool.get() {
             Ok(conn) => conn,
             Err(e) => {
                 log::error!("Error getting DB connection: {:?}", e);
@@ -34,10 +40,29 @@ pub async fn start(pool: DbPool) {
                     if response.status().is_success() {
                         log::info!("Got response for feed {}", feed.url);
                         let body = response.text().await.unwrap();
-                        let (parsed_feed, feed_updates) = parse_feed(&body, &feed);
-                        log::info!("Found updates: {:?}", feed_updates);
-                        log::info!("Found {} items", parsed_feed.len());
+                        let (parsed_items, feed_updates) = parse_feed(&body, &feed);
+
+                        // only update the feed if there are some Some
+                        // values in the updates
+                        if feed_updates.feed_type.is_some()
+                            || feed_updates.title.is_some()
+                            || feed_updates.last_updated.is_some()
+                        {
+                            log::info!("Found updates: {:?}, updating feed", feed_updates);
+                            Feed::update(&mut update_conn, feed.id, &feed_updates.into());
+                        }
+
+                        log::info!("Found {} items", parsed_items.len());
+
+                        // insert the feed items
+                        insert_feed_items_and_update_feed(&mut update_conn, parsed_items)
                     } else {
+                        let error_update = PartialFeed {
+                            error_time: Some(chrono::Utc::now().timestamp() as i32),
+                            error_message: Some(response.status().to_string()),
+                            ..Default::default()
+                        };
+                        Feed::update(&mut update_conn, feed.id, &error_update);
                         log::warn!(
                             "Got non-success response for feed {}: {}",
                             feed.url,
@@ -46,7 +71,12 @@ pub async fn start(pool: DbPool) {
                     }
                 }
                 Err(e) => {
-                    // TODO: update error in DB
+                    let error_update = PartialFeed {
+                        error_time: Some(chrono::Utc::now().timestamp() as i32),
+                        error_message: Some(e.to_string()),
+                        ..Default::default()
+                    };
+                    Feed::update(&mut update_conn, feed.id, &error_update);
                     log::warn!("Error getting feed {}: {:?}", feed.url, e);
                 }
             }
@@ -70,6 +100,17 @@ impl Default for FeedUpdates {
             feed_type: None,
             title: None,
             last_updated: None,
+        }
+    }
+}
+
+impl From<FeedUpdates> for PartialFeed {
+    fn from(updates: FeedUpdates) -> Self {
+        PartialFeed {
+            feed_type: updates.feed_type,
+            title: updates.title,
+            last_updated: updates.last_updated,
+            ..Default::default()
         }
     }
 }
@@ -125,7 +166,7 @@ fn parse_feed(body: &str, feed: &Feed) -> (Vec<NewFeedItem>, FeedUpdates) {
 
         let item = NewFeedItem {
             feed_id: feed.id,
-            title: title,
+            title,
             link: entry.links[0].href.clone(),
             pub_date,
             description: entry.summary.map(|s| s.content),
@@ -138,8 +179,25 @@ fn parse_feed(body: &str, feed: &Feed) -> (Vec<NewFeedItem>, FeedUpdates) {
     (feed_items, feed_updates)
 }
 
-fn insert_feed_items_and_update_feed(conn: &mut SqliteConnection, parsed_feed: FeedItem) {
+fn insert_feed_items_and_update_feed(conn: &mut SqliteConnection, parsed_items: Vec<NewFeedItem>) {
     // Implement this function to insert the new feed items into the `feed_items`
     // table and update the `last_checked` and `last_updated` fields in the `feeds` table
-    unimplemented!()
+
+    let mut num_added = 0;
+    let feed_id = match parsed_items.get(0) {
+        Some(item) => item.feed_id,
+        None => return,
+    };
+    // insert the feed items
+    for item in parsed_items {
+        if !FeedItem::has(conn, &item) {
+            log::info!("Inserting item: {:?}", item.link);
+            item.insert(conn);
+            num_added += 1;
+        } else {
+            log::debug!("Item already exists: {:?}", item.link);
+        }
+    }
+
+    log::info!("Added {} items to feed_id={:?}", num_added, feed_id);
 }

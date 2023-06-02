@@ -1,9 +1,16 @@
+use actix_web::web;
 use serde::{Deserialize, Serialize};
 
 use crate::models::{
     feed::Feed,
     subscription::{Frequency, Subscription},
 };
+
+#[derive(Debug, Deserialize)]
+pub struct SubIdPath {
+    pub sub_id: String,
+}
+pub type RqSubId = web::Path<SubIdPath>;
 
 #[derive(Debug, Deserialize)]
 pub struct SubscriptionCreate {

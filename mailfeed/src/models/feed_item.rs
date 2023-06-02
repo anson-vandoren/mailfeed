@@ -100,6 +100,19 @@ impl FeedItem {
             }
         }
     }
+
+    pub fn has(conn: &mut SqliteConnection, item: &NewFeedItem) -> bool {
+        use crate::schema::feed_items::dsl::{feed_id, feed_items, link, pub_date};
+        match feed_items
+            .filter(feed_id.eq(item.feed_id))
+            .filter(link.eq(item.link.clone()))
+            .filter(pub_date.eq(item.pub_date))
+            .first::<FeedItem>(conn)
+        {
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    }
 }
 
 #[cfg(test)]

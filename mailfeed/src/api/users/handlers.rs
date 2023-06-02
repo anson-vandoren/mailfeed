@@ -61,9 +61,9 @@ pub async fn create_user(
     }
 }
 
-#[get("/{id}")]
-pub async fn get_user(pool: RqDbPool, path: RqUserId, claims: Claims) -> impl Responder {
-    let id = path.id.parse::<i32>();
+#[get("/{user_id}")]
+pub async fn get_user(pool: RqDbPool, user_path: RqUserId, claims: Claims) -> impl Responder {
+    let id = user_path.user_id.parse::<i32>();
 
     if let Err(_) = id {
         return HttpResponse::BadRequest().body("Invalid user ID");
@@ -91,7 +91,7 @@ pub async fn get_user(pool: RqDbPool, path: RqUserId, claims: Claims) -> impl Re
     HttpResponse::Ok().body(user_json)
 }
 
-#[patch("/{id}")]
+#[patch("/{user_id}")]
 pub async fn update_user(
     pool: RqDbPool,
     path: RqUserId,
@@ -102,7 +102,7 @@ pub async fn update_user(
     if updates.is_empty() {
         return HttpResponse::BadRequest().body("No fields to update");
     }
-    let id = match path.id.parse::<i32>() {
+    let id = match path.user_id.parse::<i32>() {
         Ok(id) => id,
         Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),
     };
@@ -140,9 +140,9 @@ pub async fn update_user(
     HttpResponse::Ok().body(user_json)
 }
 
-#[delete("/{id}")]
-pub async fn delete_user(pool: RqDbPool, path: RqUserId, claims: Claims) -> impl Responder {
-    let id = match path.id.parse::<i32>() {
+#[delete("/{user_id}")]
+pub async fn delete_user(pool: RqDbPool, user_path: RqUserId, claims: Claims) -> impl Responder {
+    let id = match user_path.user_id.parse::<i32>() {
         Ok(id) => id,
         Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),
     };
