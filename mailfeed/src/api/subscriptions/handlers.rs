@@ -60,7 +60,7 @@ pub async fn create_subscription(
     }
 
     // if sub_req.url isn't a valid URL, return 400
-    if let Err(_) = url::Url::parse(&sub_req.url) {
+    if url::Url::parse(&sub_req.url).is_err() {
         return HttpResponse::BadRequest().body("Invalid feed URL");
     }
 
@@ -96,14 +96,14 @@ pub async fn create_subscription(
         Ok(subs) => subs,
         Err(_) => return HttpResponse::InternalServerError().body("Error getting subscriptions"),
     };
-    if let Some(_) = user_subs.iter().find(|s| s.feed_id == feed.id) {
+    if user_subs.iter().any(|s| s.feed_id == feed.id) {
         return HttpResponse::BadRequest().body("User already subscribed to this feed");
     }
 
     let mut new_sub = NewSubscription {
         user_id,
         feed_id: feed.id,
-        frequency: sub_req.frequency.clone(),
+        frequency: sub_req.frequency,
         ..Default::default()
     };
 

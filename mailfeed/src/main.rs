@@ -58,7 +58,7 @@ fn main() -> std::io::Result<()> {
     run_server(config.public_path, db_pool, config.port)
 }
 
-fn cli_create_user(db: &mut SqliteConnection) -> () {
+fn cli_create_user(db: &mut SqliteConnection) {
     println!("\nEnter user login email:");
     let mut email = String::new();
     std::io::stdin()

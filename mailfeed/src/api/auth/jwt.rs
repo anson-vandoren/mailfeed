@@ -33,8 +33,7 @@ fn create_token(user: &User, duration: i64) -> Result<String, Error> {
     };
 
     let header = Header::new(Algorithm::HS512);
-    encode(&header, &claims, &EncodingKey::from_secret(&secret))
-        .map_err(|_| Error::JWTCreationError)
+    encode(&header, &claims, &EncodingKey::from_secret(secret)).map_err(|_| Error::JWTCreationError)
 }
 
 pub fn create_access_token(user: &User) -> Result<String, Error> {
@@ -58,7 +57,7 @@ pub fn verify_and_extract_claims(header_val: &str) -> Option<Claims> {
 
     let validation = Validation::new(Algorithm::HS512);
 
-    decode::<Claims>(token, &DecodingKey::from_secret(&jwt_secret), &validation)
+    decode::<Claims>(token, &DecodingKey::from_secret(jwt_secret), &validation)
         .map(|data| data.claims)
         .ok()
 }

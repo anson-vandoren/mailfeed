@@ -21,7 +21,7 @@ pub async fn login(pool: RqDbPool, login_req: web::Json<LoginRequest>) -> impl R
         None => return HttpResponse::BadRequest().body("Invalid email or password"),
     };
 
-    if user.is_active == false {
+    if !user.is_active {
         return HttpResponse::BadRequest().body("Account is deactivated - contact admin");
     }
 
@@ -104,7 +104,7 @@ pub async fn refresh(pool: RqDbPool, refresh_req: web::Json<RefreshRequest>) -> 
         None => return HttpResponse::Unauthorized().body("Invalid refresh token"),
     };
 
-    if user.is_active == false {
+    if !user.is_active {
         if let Err(e) = User::clear_refresh_token(&mut conn, UserQuery::Id(user.id.unwrap())) {
             log::error!("Error clearing refresh token: {:?}", e);
         }

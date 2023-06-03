@@ -92,7 +92,7 @@ impl<'a> Default for NewFeed<'a> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, AsChangeset)]
+#[derive(Debug, Default, Serialize, Deserialize, AsChangeset)]
 #[diesel(table_name = feeds)]
 pub struct PartialFeed {
     pub url: Option<String>,
@@ -117,41 +117,7 @@ impl<'a> NewFeed<'a> {
     }
 }
 
-impl Default for PartialFeed {
-    fn default() -> Self {
-        PartialFeed {
-            url: None,
-            feed_type: None,
-            title: None,
-            last_checked: None,
-            last_updated: None,
-            error_time: None,
-            error_message: None,
-        }
-    }
-}
-
-impl<'a> Feed {
-    pub fn new(
-        url: &'a str,
-        feed_type: FeedType,
-        title: String,
-        last_checked: i32, // zero if never checked
-        last_updated: i32,
-        error_time: i32, // zero if no error
-        error_message: Option<String>,
-    ) -> NewFeed<'a> {
-        NewFeed {
-            url,
-            feed_type,
-            title,
-            last_checked,
-            last_updated,
-            error_time,
-            error_message,
-        }
-    }
-
+impl Feed {
     pub fn get_by_id(conn: &mut SqliteConnection, id: i32) -> Option<Feed> {
         use crate::schema::feeds::dsl::feeds;
         match feeds.find(id).first::<Feed>(conn) {

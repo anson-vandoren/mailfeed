@@ -16,18 +16,18 @@ pub struct FeedItem {
     pub author: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Insertable)]
+#[derive(Debug, Default, Serialize, Deserialize, Insertable)]
 #[diesel(table_name = feed_items)]
-pub struct NewFeedItem {
+pub struct NewFeedItem<'a> {
     pub feed_id: i32,
-    pub title: String, // TODO: make optional
-    pub link: String,  // TODO: add link_title
+    pub title: &'a str, // TODO: make optional
+    pub link: &'a str,  // TODO: add link_title
     pub pub_date: i32,
-    pub description: Option<String>, // TODO: rename to summary
-    pub author: Option<String>,
+    pub description: Option<&'a str>, // TODO: rename to summary
+    pub author: Option<&'a str>,
 }
 
-impl NewFeedItem {
+impl<'a> NewFeedItem<'a> {
     pub fn insert(&self, conn: &mut SqliteConnection) -> Option<FeedItem> {
         use crate::schema::feed_items::dsl::*;
         match diesel::insert_into(feed_items)
@@ -41,27 +41,30 @@ impl NewFeedItem {
             }
         }
     }
+
+    pub fn insert_if_not_present(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> Result<Option<FeedItem>, diesel::result::Error> {
+        use crate::schema::feed_items::dsl::*;
+
+        if FeedItem::has(conn, self) {
+            return Ok(None);
+        }
+        match diesel::insert_into(feed_items)
+            .values(self)
+            .get_result(conn)
+        {
+            Ok(item) => Ok(Some(item)),
+            Err(e) => {
+                log::warn!("Error inserting feed item: {:?}", e);
+                Err(e)
+            }
+        }
+    }
 }
 
 impl FeedItem {
-    pub fn new(
-        feed_id: i32,
-        title: String,
-        link: String,
-        pub_date: i32,
-        description: Option<String>,
-        author: Option<String>,
-    ) -> NewFeedItem {
-        NewFeedItem {
-            feed_id,
-            title,
-            link,
-            pub_date,
-            description,
-            author,
-        }
-    }
-
     pub fn get_by_id(conn: &mut SqliteConnection, id: i32) -> Option<FeedItem> {
         use crate::schema::feed_items::dsl::feed_items;
         match feed_items.find(id).first::<FeedItem>(conn) {
@@ -103,15 +106,12 @@ impl FeedItem {
 
     pub fn has(conn: &mut SqliteConnection, item: &NewFeedItem) -> bool {
         use crate::schema::feed_items::dsl::{feed_id, feed_items, link, pub_date};
-        match feed_items
+        feed_items
             .filter(feed_id.eq(item.feed_id))
-            .filter(link.eq(item.link.clone()))
+            .filter(link.eq(item.link))
             .filter(pub_date.eq(item.pub_date))
             .first::<FeedItem>(conn)
-        {
-            Ok(_) => true,
-            Err(_) => false,
-        }
+            .is_ok()
     }
 }
 
@@ -123,14 +123,12 @@ mod tests {
     fn insert_items(conn: &mut SqliteConnection, num_items: i32, feed_id: i32) -> Vec<FeedItem> {
         let mut inserted = Vec::new();
         for i in 0..num_items {
-            let item = FeedItem::new(
+            let item = NewFeedItem {
                 feed_id,
-                format!("test_title_{}", i),
-                format!("http://test.com/{}", i),
-                0,
-                None,
-                None,
-            );
+                title: &format!("test_title_{}", i),
+                link: &format!("http://test.com/{}", i),
+                ..Default::default()
+            };
             let fi = item.insert(conn);
             match fi {
                 Some(fi) => inserted.push(fi),

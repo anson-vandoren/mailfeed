@@ -6,7 +6,7 @@ use reqwest::Client;
 use crate::{
     models::{
         feed::{Feed, FeedType, PartialFeed},
-        feed_item::{FeedItem, NewFeedItem},
+        feed_item::NewFeedItem,
     },
     DbPool,
 };
@@ -40,22 +40,7 @@ pub async fn start(pool: DbPool) {
                     if response.status().is_success() {
                         log::info!("Got response for feed {}", feed.url);
                         let body = response.text().await.unwrap();
-                        let (parsed_items, feed_updates) = parse_feed(&body, &feed);
-
-                        // only update the feed if there are some Some
-                        // values in the updates
-                        if feed_updates.feed_type.is_some()
-                            || feed_updates.title.is_some()
-                            || feed_updates.last_updated.is_some()
-                        {
-                            log::info!("Found updates: {:?}, updating feed", feed_updates);
-                            Feed::update(&mut update_conn, feed.id, &feed_updates.into());
-                        }
-
-                        log::info!("Found {} items", parsed_items.len());
-
-                        // insert the feed items
-                        insert_feed_items_and_update_feed(&mut update_conn, parsed_items)
+                        parse_and_insert(&mut update_conn, &body, feed);
                     } else {
                         let error_update = PartialFeed {
                             error_time: Some(chrono::Utc::now().timestamp() as i32),
@@ -87,21 +72,11 @@ pub async fn start(pool: DbPool) {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct FeedUpdates {
     feed_type: Option<FeedType>,
     title: Option<String>,
     last_updated: Option<i32>,
-}
-
-impl Default for FeedUpdates {
-    fn default() -> Self {
-        FeedUpdates {
-            feed_type: None,
-            title: None,
-            last_updated: None,
-        }
-    }
 }
 
 impl From<FeedUpdates> for PartialFeed {
@@ -115,14 +90,13 @@ impl From<FeedUpdates> for PartialFeed {
     }
 }
 
-fn parse_feed(body: &str, feed: &Feed) -> (Vec<NewFeedItem>, FeedUpdates) {
-    let mut feed_items = Vec::new();
+fn parse_and_insert(conn: &mut SqliteConnection, body: &str, feed: &Feed) {
     let mut feed_updates = FeedUpdates::default();
     let parsed = match feed_rs::parser::parse(body.as_bytes()) {
         Ok(parsed) => parsed,
         Err(e) => {
             log::warn!("Error parsing feed: {:?}", e);
-            return (feed_items, feed_updates);
+            return;
         }
     };
     // update feed.feed_type if it is FeedType::Unknown
@@ -134,7 +108,7 @@ fn parse_feed(body: &str, feed: &Feed) -> (Vec<NewFeedItem>, FeedUpdates) {
             feed_rs::model::FeedType::RSS2 => FeedType::Rss,
             feed_rs::model::FeedType::JSON => FeedType::JsonFeed,
         };
-        feed_updates.feed_type = Some(FeedType::from(feed_type));
+        feed_updates.feed_type = Some(feed_type);
     }
 
     // update feed.title if it is an empty string
@@ -147,11 +121,23 @@ fn parse_feed(body: &str, feed: &Feed) -> (Vec<NewFeedItem>, FeedUpdates) {
     // update feed.last_updated if parsed.updated is Some
     if let Some(updated) = parsed.updated {
         let last_updated = updated.timestamp() as i32;
-        let last_updated = last_updated as i32;
+        let last_updated = last_updated;
         if feed.last_updated != last_updated {
             feed_updates.last_updated = Some(last_updated);
         }
     }
+    // only update the feed if there are some Some
+    // values in the updates
+    if feed_updates.feed_type.is_some()
+        || feed_updates.title.is_some()
+        || feed_updates.last_updated.is_some()
+    {
+        log::info!("Found updates: {:?}, updating feed", feed_updates);
+        Feed::update(conn, feed.id, &feed_updates.into());
+    }
+
+    log::info!("Found {} items", parsed.entries.len());
+    let mut num_added = 0;
 
     // insert new feed items
     for entry in parsed.entries {
@@ -162,42 +148,30 @@ fn parse_feed(body: &str, feed: &Feed) -> (Vec<NewFeedItem>, FeedUpdates) {
         let pub_date: i32 = entry.published.map(|p| p.timestamp() as i32).unwrap_or(0);
 
         // entry.authors may be an empty Vec
-        let author = entry.authors.get(0).map(|a| a.name.clone());
+        let author = entry.authors.get(0).map(|a| a.name.as_str());
+        let description = entry.summary.map(|s| s.content);
 
         let item = NewFeedItem {
             feed_id: feed.id,
-            title,
-            link: entry.links[0].href.clone(),
+            title: &title,
+            link: &entry.links[0].href,
             pub_date,
-            description: entry.summary.map(|s| s.content),
+            description: description.as_deref(),
             author,
         };
-
-        feed_items.push(item);
-    }
-
-    (feed_items, feed_updates)
-}
-
-fn insert_feed_items_and_update_feed(conn: &mut SqliteConnection, parsed_items: Vec<NewFeedItem>) {
-    // Implement this function to insert the new feed items into the `feed_items`
-    // table and update the `last_checked` and `last_updated` fields in the `feeds` table
-
-    let mut num_added = 0;
-    let feed_id = match parsed_items.get(0) {
-        Some(item) => item.feed_id,
-        None => return,
-    };
-    // insert the feed items
-    for item in parsed_items {
-        if !FeedItem::has(conn, &item) {
-            log::info!("Inserting item: {:?}", item.link);
-            item.insert(conn);
-            num_added += 1;
-        } else {
-            log::debug!("Item already exists: {:?}", item.link);
+        let result = item.insert_if_not_present(conn);
+        match result {
+            Ok(Some(_)) => {
+                num_added += 1;
+            }
+            Ok(None) => {
+                log::debug!("Item already exists: {:?}", item.link);
+            }
+            Err(e) => {
+                log::warn!("Error inserting item: {:?}", e);
+            }
         }
     }
 
-    log::info!("Added {} items to feed_id={:?}", num_added, feed_id);
+    log::info!("Added {} items", num_added);
 }

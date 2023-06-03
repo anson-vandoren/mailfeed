@@ -125,25 +125,6 @@ impl NewSubscription {
 }
 
 impl Subscription {
-    pub fn new(
-        user_id: i32,
-        friendly_name: String,
-        frequency: Frequency,
-        max_items: i32,
-        is_active: bool,
-        feed_id: i32,
-    ) -> NewSubscription {
-        NewSubscription {
-            user_id,
-            friendly_name,
-            frequency,
-            last_sent_time: 0,
-            max_items,
-            is_active,
-            feed_id,
-        }
-    }
-
     pub fn get_by_id(conn: &mut SqliteConnection, id: i32) -> Option<Subscription> {
         use crate::schema::subscriptions::dsl::subscriptions;
         match subscriptions.find(id).first::<Subscription>(conn) {

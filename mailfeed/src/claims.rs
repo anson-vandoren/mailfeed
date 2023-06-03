@@ -75,6 +75,6 @@ impl FromRequest for Claims {
             Err(err) => return ready(Err(err.into())),
         };
 
-        ready(Ok(token.claims.clone()))
+        ready(Ok(token.claims))
     }
 }

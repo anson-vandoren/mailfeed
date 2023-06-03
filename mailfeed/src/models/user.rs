@@ -22,7 +22,7 @@ pub struct User {
     pub refresh_token: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, AsChangeset)]
+#[derive(Debug, Default, Serialize, Deserialize, AsChangeset)]
 #[diesel(table_name = users)]
 pub struct PartialUser {
     pub login_email: Option<String>,
@@ -41,19 +41,6 @@ impl PartialUser {
             && self.is_active.is_none()
             && self.daily_send_time.is_none()
             && self.role.is_none()
-    }
-}
-
-impl Default for PartialUser {
-    fn default() -> Self {
-        Self {
-            login_email: None,
-            send_email: None,
-            is_active: None,
-            daily_send_time: None,
-            role: None,
-            refresh_token: None,
-        }
     }
 }
 
@@ -81,9 +68,9 @@ pub enum UserQuery<'a> {
 
 impl User {
     // TODO: refactor the way the models for feed_items and feeds are
-    pub fn create<'a>(
+    pub fn create(
         conn: &mut SqliteConnection,
-        new_user: &'a NewUser,
+        new_user: &NewUser,
         claims: Claims,
     ) -> Result<User, UserTableError> {
         if &claims.role != "admin" {
@@ -195,7 +182,7 @@ impl User {
             Ok(user) => Ok(user),
             Err(err) => {
                 log::error!("Failed to update user: {:?}", err);
-                return Err(UserTableError::DatabaseError);
+                Err(UserTableError::DatabaseError)
             }
         }
     }
@@ -253,14 +240,14 @@ impl User {
 
         if deleted_rows == Some(0) {
             log::warn!("User with id {} does not exist", user_id);
-            return Err(UserTableError::UserNotFound);
+            Err(UserTableError::UserNotFound)
         } else {
-            return Ok(());
+            Ok(())
         }
     }
 
     fn hash_password(password: &str) -> Result<String, UserTableError> {
-        if password.len() < 1 {
+        if password.is_empty() {
             return Err(UserTableError::PasswordTooShort);
         }
         let salt = SaltString::generate(&mut OsRng);

@@ -35,7 +35,7 @@ pub enum Error {
     #[error("Setting '{key:?}' not found for user with id={user_id:?}")]
     SettingNotFound { key: String, user_id: Option<i32> },
     #[error("Database error")]
-    DatabaseError,
+    Database,
 }
 
 impl Setting {
@@ -81,7 +81,7 @@ impl Setting {
             .get_result(conn)
         {
             Ok(setting) => Ok(setting),
-            Err(_) => Err(Error::DatabaseError),
+            Err(_) => Err(Error::Database),
         }
     }
 

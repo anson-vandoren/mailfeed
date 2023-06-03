@@ -65,7 +65,7 @@ pub async fn create_user(
 pub async fn get_user(pool: RqDbPool, user_path: RqUserId, claims: Claims) -> impl Responder {
     let id = user_path.user_id.parse::<i32>();
 
-    if let Err(_) = id {
+    if id.is_err() {
         return HttpResponse::BadRequest().body("Invalid user ID");
     }
     let id = id.unwrap();
@@ -131,7 +131,7 @@ pub async fn update_user(
     };
 
     let updated_user = match User::update(&mut conn, id, &updates) {
-        Ok(_) => (),
+        Ok(user) => user,
         Err(UserTableError::EmailExists) => return HttpResponse::BadRequest().body("Email exists"),
         Err(_) => return HttpResponse::InternalServerError().body("Error updating user"),
     };
