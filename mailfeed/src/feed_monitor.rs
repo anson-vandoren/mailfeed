@@ -14,6 +14,7 @@ use crate::{
 pub async fn start(pool: DbPool) {
     let http_client = Client::new();
     loop {
+        tokio::time::sleep(Duration::from_secs(60)).await;
         let mut conn = match pool.get() {
             Ok(conn) => conn,
             Err(e) => {
@@ -28,10 +29,13 @@ pub async fn start(pool: DbPool) {
                 continue;
             }
         };
-        let feeds: Vec<Feed> =
-            spawn_blocking(move || Feed::get_all(&mut conn).unwrap_or(Vec::new()))
-                .await
-                .unwrap();
+        let feeds: Vec<Feed> = match Feed::get_all(&mut conn) {
+            Some(feeds) => feeds,
+            None => {
+                log::info!("No feeds found");
+                continue;
+            }
+        };
 
         for feed in &feeds {
             let response = http_client.get(&feed.url).send().await;
@@ -68,7 +72,6 @@ pub async fn start(pool: DbPool) {
         }
         let num_feeds = feeds.len();
         log::info!("Found {} feeds", num_feeds);
-        tokio::time::sleep(Duration::from_secs(60)).await;
     }
 }
 
