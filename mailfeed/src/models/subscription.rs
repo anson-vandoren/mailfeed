@@ -25,6 +25,7 @@ pub struct Subscription {
     pub max_items: i32,
     pub is_active: bool,
     pub feed_id: i32,
+    // TODO: add send_existing option
 }
 
 #[repr(i32)]
@@ -164,6 +165,30 @@ impl Subscription {
                 log::warn!("Error getting subscriptions: {:?}", e);
                 Err(e)
             }
+        }
+    }
+
+    pub fn get_for_user_and_feed(
+        conn: &mut SqliteConnection,
+        user_id: i32,
+        feed_id: i32,
+    ) -> Result<Option<Subscription>, diesel::result::Error> {
+        use crate::schema::subscriptions::dsl::{
+            feed_id as feed_id_col, subscriptions, user_id as user_id_col,
+        };
+        match subscriptions
+            .filter(user_id_col.eq(user_id))
+            .filter(feed_id_col.eq(feed_id))
+            .first::<Subscription>(conn)
+        {
+            Ok(found) => Ok(Some(found)),
+            Err(e) => match e {
+                diesel::result::Error::NotFound => Ok(None),
+                _ => {
+                    log::warn!("Error getting subscriptions: {:?}", e);
+                    Err(e)
+                }
+            },
         }
     }
 

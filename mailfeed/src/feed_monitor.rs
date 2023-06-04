@@ -1,5 +1,5 @@
 use diesel::SqliteConnection;
-use tokio::{task::spawn_blocking, time::Duration};
+use tokio::time::Duration;
 
 use reqwest::Client;
 
@@ -11,10 +11,11 @@ use crate::{
     DbPool,
 };
 
+pub const FEED_CHECK_INTERVAL: Duration = Duration::from_secs(60 * 5);
+
 pub async fn start(pool: DbPool) {
     let http_client = Client::new();
     loop {
-        tokio::time::sleep(Duration::from_secs(60)).await;
         let mut conn = match pool.get() {
             Ok(conn) => conn,
             Err(e) => {
@@ -33,6 +34,7 @@ pub async fn start(pool: DbPool) {
             Some(feeds) => feeds,
             None => {
                 log::info!("No feeds found");
+                tokio::time::sleep(FEED_CHECK_INTERVAL).await;
                 continue;
             }
         };
@@ -72,6 +74,7 @@ pub async fn start(pool: DbPool) {
         }
         let num_feeds = feeds.len();
         log::info!("Found {} feeds", num_feeds);
+        tokio::time::sleep(FEED_CHECK_INTERVAL).await;
     }
 }
 
@@ -123,8 +126,17 @@ fn parse_and_insert(conn: &mut SqliteConnection, body: &str, feed: &Feed) {
 
     // update feed.last_updated if parsed.updated is Some
     if let Some(updated) = parsed.updated {
-        let last_updated = updated.timestamp() as i32;
-        let last_updated = last_updated;
+        let mut last_updated = updated.timestamp() as i32;
+        let newest_item_ts = parsed
+            .entries
+            .first()
+            .map(|i| i.published.map(|p| p.timestamp() as i32));
+
+        if let Some(Some(newest_item_ts)) = newest_item_ts {
+            if newest_item_ts > last_updated {
+                last_updated = newest_item_ts;
+            }
+        }
         if feed.last_updated != last_updated {
             feed_updates.last_updated = Some(last_updated);
         }

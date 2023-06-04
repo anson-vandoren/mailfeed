@@ -49,7 +49,7 @@ pub async fn login(pool: RqDbPool, login_req: web::Json<LoginRequest>) -> impl R
         ..Default::default()
     };
     // add refresh token to users table
-    if let Err(e) = User::update(&mut conn, user.id.unwrap(), &updates) {
+    if let Err(e) = User::update(&mut conn, user.id, &updates) {
         log::error!("Error updating user: {:?}", e);
         return HttpResponse::InternalServerError().body("Error updating user");
     }
@@ -105,7 +105,7 @@ pub async fn refresh(pool: RqDbPool, refresh_req: web::Json<RefreshRequest>) -> 
     };
 
     if !user.is_active {
-        if let Err(e) = User::clear_refresh_token(&mut conn, UserQuery::Id(user.id.unwrap())) {
+        if let Err(e) = User::clear_refresh_token(&mut conn, UserQuery::Id(user.id)) {
             log::error!("Error clearing refresh token: {:?}", e);
         }
         return HttpResponse::BadRequest().body("Account is deactivated - contact admin");

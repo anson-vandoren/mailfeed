@@ -6,10 +6,25 @@ use argon2::{
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Identifiable, AsChangeset)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Identifiable, AsChangeset)]
 #[diesel(table_name = users)]
 pub struct User {
-    pub id: Option<i32>,
+    pub id: i32,
+    pub login_email: String,
+    pub send_email: String,
+    #[serde(skip_serializing)]
+    pub password: String,
+    pub created_at: i32,
+    pub is_active: bool,
+    pub daily_send_time: String, // HH:MM+HH:MM
+    pub role: String,            // CSV
+    #[serde(skip_serializing)]
+    pub refresh_token: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Insertable, AsChangeset)]
+#[diesel(table_name = users)]
+pub struct InsertableUser {
     pub login_email: String,
     pub send_email: String,
     #[serde(skip_serializing)]
@@ -100,8 +115,7 @@ impl User {
             }
         };
 
-        let user = User {
-            id: None,
+        let user = InsertableUser {
             login_email: new_user.email.clone(),
             send_email: new_user.email.clone(),
             password: password_hash,
@@ -391,7 +405,7 @@ mod tests {
             refresh_token: Some("some refresh token".into()),
         };
 
-        let result = User::update(&mut conn, existing_user.id.unwrap(), &user);
+        let result = User::update(&mut conn, existing_user.id, &user);
         assert!(result.is_ok());
 
         let user = User::get(&mut conn, UserQuery::Email(&user.login_email.unwrap())).unwrap();
@@ -423,7 +437,7 @@ mod tests {
         let user = User::get(&mut conn, UserQuery::Email(&new_user.email)).unwrap();
         assert_eq!(user.login_email, new_user.email);
 
-        let result = User::delete(&mut conn, user.id.unwrap(), claims);
+        let result = User::delete(&mut conn, user.id, claims);
         assert!(result.is_ok());
     }
 
@@ -455,18 +469,18 @@ mod tests {
             exp: (Utc::now().timestamp() + 1000) as usize,
         };
 
-        let result = User::delete(&mut conn, user.id.unwrap(), claims);
+        let result = User::delete(&mut conn, user.id, claims);
         assert!(result.is_err());
 
         // should be able to delete self
         let claims = Claims {
-            sub: user.id.unwrap(),
+            sub: user.id,
             email: new_user.email.clone(),
             role: "user".into(),
             exp: (Utc::now().timestamp() + 1000) as usize,
         };
 
-        let result = User::delete(&mut conn, user.id.unwrap(), claims);
+        let result = User::delete(&mut conn, user.id, claims);
         assert!(result.is_ok());
     }
 }

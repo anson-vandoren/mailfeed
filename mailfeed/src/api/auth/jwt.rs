@@ -15,13 +15,8 @@ fn create_token(user: &User, duration: i64) -> Result<String, Error> {
         .expect("valid timestamp")
         .timestamp();
 
-    let uid = match user.id {
-        Some(id) => id,
-        None => return Err(Error::JWTSecretGenerationError),
-    };
-
     let claims = Claims {
-        sub: uid,
+        sub: user.id,
         exp: expiration as usize,
         role: user.role.clone(),
         email: user.login_email.clone(),
@@ -78,7 +73,7 @@ mod tests {
 
     fn get_test_user() -> User {
         User {
-            id: Some(1),
+            id: 1,
             login_email: "testy@mctestface.com".to_string(),
             send_email: "testy@mctestface.com".to_string(),
             role: "user".to_string(),
@@ -108,7 +103,7 @@ mod tests {
 
         let jwt = token_to_claims(&jwt);
         assert_eq!(jwt.email, user.login_email);
-        assert_eq!(jwt.sub, user.id.unwrap());
+        assert_eq!(jwt.sub, user.id);
         assert_eq!(jwt.role, user.role);
         // expires in about 15 minutes
         assert!(jwt.exp > Utc::now().timestamp() as usize + 15 * 60 - 5);

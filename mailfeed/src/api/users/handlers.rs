@@ -82,7 +82,7 @@ pub async fn get_user(pool: RqDbPool, user_path: RqUserId, claims: Claims) -> im
         None => return HttpResponse::InternalServerError().body("Error getting user"),
     };
 
-    if &claims.role != "admin" && claims.sub != user.id.unwrap_or(-1) {
+    if &claims.role != "admin" && claims.sub != user.id {
         log::warn!("Unauthorized attempt to get user by {}", claims.sub);
         return HttpResponse::Forbidden().body("Forbidden");
     }

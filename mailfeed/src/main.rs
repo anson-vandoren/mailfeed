@@ -2,6 +2,7 @@ extern crate diesel;
 
 mod api;
 mod claims;
+mod email_sender;
 mod feed_monitor;
 mod global;
 mod models;
@@ -104,7 +105,7 @@ fn cli_create_user(db: &mut SqliteConnection) {
         ..Default::default()
     };
 
-    match User::update(db, user.id.unwrap(), &updates) {
+    match User::update(db, user.id, &updates) {
         Ok(user) => {
             println!("User created successfully");
             // print the user to stdout
@@ -173,6 +174,7 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
     log::info!("Starting server at http://127.0.0.1:{}", port);
 
     tokio::spawn(feed_monitor::start(db_pool.clone()));
+    tokio::spawn(email_sender::start(db_pool.clone()));
 
     HttpServer::new(move || {
         App::new()

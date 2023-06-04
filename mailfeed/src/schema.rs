@@ -51,7 +51,7 @@ diesel::table! {
 
 diesel::table! {
     users (id) {
-        id -> Nullable<Integer>,
+        id -> Integer,
         login_email -> Text,
         send_email -> Text,
         password -> Text,
