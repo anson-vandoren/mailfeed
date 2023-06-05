@@ -14,7 +14,7 @@ use crate::{
     models::{
         feed::Feed,
         feed_item::FeedItem,
-        subscription::{Frequency, Subscription},
+        subscription::{Frequency, PartialSubscription, Subscription},
         user::User,
     },
     DbPool,
@@ -72,33 +72,44 @@ pub async fn start(pool: DbPool) {
 
         for user in users {
             let email_data = items_to_send_by_user(&mut conn, user.id);
-            let email_html = to_html_email(&email_data);
-            let email_plain = to_plain_email(&email_data);
-            let message =
-                construct_email(&user.send_email, &cfg.from_email, &email_html, &email_plain);
-            let message = match message {
-                Ok(message) => message,
-                Err(e) => {
-                    log::error!("Error constructing email: {:?}", e);
-                    tokio::time::sleep(FEED_CHECK_INTERVAL).await;
+            for feed_data in &email_data.feed_data {
+                if feed_data.new_items.is_empty() {
+                    log::debug!("No new items for sub_id={}", feed_data.sub_id);
                     continue;
                 }
-            };
-            let email_result = sender.send(&message);
-            match email_result {
-                Ok(_) => {
-                    log::info!("Email sent to {}", user.send_email);
+                let plain = to_plain_email(feed_data);
+                let html = to_html_email(feed_data);
+                let message = construct_email(&user.send_email, &cfg.from_email, &html, &plain);
+                let message = match message {
+                    Ok(message) => message,
+                    Err(e) => {
+                        log::error!("Error constructing email: {:?}", e);
+                        continue;
+                    }
+                };
+                let email_result = sender.send(&message);
+                match email_result {
+                    Ok(_) => {
+                        log::info!(
+                            "Email sent to {} for sub_id={}",
+                            user.send_email,
+                            feed_data.sub_id
+                        );
+                    }
+                    Err(e) => {
+                        log::error!("Error sending email: {:?}", e);
+                        continue;
+                    }
                 }
-                Err(e) => {
-                    log::error!("Error sending email: {:?}", e);
-                }
-            }
 
-            // TODO: mark having sent
-            panic!("TODO: mark having sent");
+                let update = PartialSubscription {
+                    last_sent_time: Some(Utc::now().timestamp() as i32),
+                    ..Default::default()
+                };
+                Subscription::update(&mut conn, feed_data.sub_id, &update);
+            }
         }
 
-        // TODO: move to the top
         tokio::time::sleep(FEED_CHECK_INTERVAL).await;
     }
 }
@@ -117,6 +128,7 @@ fn items_to_send_by_feed(
 
 #[derive(Debug)]
 struct FeedData {
+    sub_id: i32,
     new_items: Vec<FeedItem>,
     feed_title: String,
     feed_link: String,
@@ -155,6 +167,7 @@ fn items_to_send_by_user(conn: &mut SqliteConnection, user_id: i32) -> EmailData
 
         let new_items = items_to_send_by_feed(conn, feed_id, last_sent);
         feed_data.push(FeedData {
+            sub_id: sub.id,
             new_items,
             feed_title: feed.title,
             feed_link: feed.url,
@@ -189,69 +202,64 @@ fn construct_email(
         )
 }
 
-fn to_html_email(email_data: &EmailData) -> String {
-    // create mutable String `result`, initialized w/ EMAIL_TEMPLATE_HEAD
+fn to_html_email(feed_data: &FeedData) -> String {
     let mut result = EMAIL_TEMPLATE_HEAD.to_string();
-    for feed_data in &email_data.feed_data {
-        result.push_str(&format!(
-            "<h2>{}</h2>
+    result.push_str(&format!(
+        "<h2>{}</h2>
             <a href='{}'>View Feed</a>",
-            feed_data.feed_title, feed_data.feed_link
-        ));
-        for item in &feed_data.new_items {
-            let date_time = Utc.timestamp_opt(item.pub_date as i64, 0).unwrap();
-            result.push_str(&format!(
-                "<div class='feed-item'>
+        feed_data.feed_title, feed_data.feed_link
+    ));
+    for item in &feed_data.new_items {
+        let date_time = Utc.timestamp_opt(item.pub_date as i64, 0).unwrap();
+        result.push_str(&format!(
+            "<div class='feed-item'>
                     <h2><a href='{}'>{}</a></h2>
                     <time>{}</time>
                     <p>{}</p>
                     <p class='author'>{}</p>
                 </div>",
-                item.link,
-                item.title,
-                item.description
-                    .clone()
-                    .unwrap_or("No description provided".to_string()),
-                date_time.format("%Y-%m-%d %H:%M:%S"),
-                item.author
-                    .clone()
-                    .unwrap_or("No author provided".to_string())
-            ));
-        }
-        result.push_str("<hr />");
+            item.link,
+            item.title,
+            item.description
+                .clone()
+                .unwrap_or("No description provided".to_string()),
+            date_time.format("%Y-%m-%d %H:%M:%S"),
+            item.author
+                .clone()
+                .unwrap_or("No author provided".to_string())
+        ));
     }
+    result.push_str("<hr />");
     // push EMAIL_TEMPLATE_FOOT to `result`
     result.push_str(EMAIL_TEMPLATE_FOOT);
     result
 }
 
-fn to_plain_email(email_data: &EmailData) -> String {
+fn to_plain_email(feed_data: &FeedData) -> String {
     let mut result = "MailFeed Digest\n\n".to_string();
-    for feed_data in &email_data.feed_data {
-        result.push_str(&format!(
-            "{}\nView Feed: {}\n",
-            feed_data.feed_title, feed_data.feed_link
-        ));
-        for item in &feed_data.new_items {
-            let date_time = Utc.timestamp_opt(item.pub_date as i64, 0).unwrap();
-            let description = item
-                .description
-                .clone()
-                .unwrap_or("No description provided".to_string());
+    result.push_str(&format!(
+        "{}\nView Feed: {}\n",
+        feed_data.feed_title, feed_data.feed_link
+    ));
+    for item in &feed_data.new_items {
+        let date_time = Utc.timestamp_opt(item.pub_date as i64, 0).unwrap();
+        let description = item
+            .description
+            .clone()
+            .unwrap_or("No description provided".to_string());
 
-            result.push_str(&format!(
-                "{}\n{}\n{}\n{}\n{}\n----------\n\n",
-                item.link,
-                item.title,
-                html_escape::decode_html_entities(&description),
-                date_time.format("%Y-%m-%d %H:%M:%S"),
-                item.author
-                    .clone()
-                    .unwrap_or("No author provided".to_string())
-            ));
-        }
-        result.push('\n');
+        result.push_str(&format!(
+            "{}\n{}\n{}\n{}\n{}\n----------\n\n",
+            item.link,
+            item.title,
+            html_escape::decode_html_entities(&description),
+            date_time.format("%Y-%m-%d %H:%M:%S"),
+            item.author
+                .clone()
+                .unwrap_or("No author provided".to_string())
+        ));
     }
+    result.push('\n');
     result
 }
 

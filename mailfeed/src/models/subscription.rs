@@ -96,7 +96,7 @@ impl Default for NewSubscription {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, AsChangeset)]
+#[derive(Debug, Default, Serialize, Deserialize, AsChangeset)]
 #[diesel(table_name = subscriptions)]
 pub struct PartialSubscription {
     pub friendly_name: Option<String>,
