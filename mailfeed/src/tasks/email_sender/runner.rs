@@ -1,5 +1,6 @@
-use std::{env, fmt::Debug};
+use std::fmt::Debug;
 
+use super::types::EmailServerCfg;
 use crate::{
     models::{
         feed::Feed,
@@ -19,32 +20,8 @@ use lettre::{
     Message, SmtpTransport, Transport,
 };
 
-#[derive(Debug)]
-pub struct EmailServerCfg {
-    pub host: String,
-    pub port: u16,
-    pub username: String,
-    pub password: String,
-    pub from_email: String,
-}
-
-fn get_server_config() -> EmailServerCfg {
-    let host = env::var("MF_SMTP_HOST").unwrap();
-    let port = env::var("MF_SMTP_PORT").unwrap().parse::<u16>().unwrap();
-    let username = env::var("MF_SMTP_USERNAME").unwrap();
-    let password = env::var("MF_SMTP_PASSWORD").unwrap();
-    let from_email = env::var("MF_FROM_EMAIL").unwrap();
-    EmailServerCfg {
-        host,
-        port,
-        username,
-        password,
-        from_email,
-    }
-}
-
 pub async fn start(pool: DbPool) {
-    let cfg = get_server_config();
+    let cfg = EmailServerCfg::from_env();
     let sender = match SmtpTransport::relay(&cfg.host) {
         Ok(sender) => sender,
         Err(e) => {

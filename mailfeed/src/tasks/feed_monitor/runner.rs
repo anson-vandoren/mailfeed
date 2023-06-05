@@ -21,13 +21,6 @@ pub async fn start(pool: DbPool) {
                 continue;
             }
         };
-        let mut update_conn = match pool.get() {
-            Ok(conn) => conn,
-            Err(e) => {
-                log::error!("Error getting DB connection: {:?}", e);
-                continue;
-            }
-        };
         let feeds: Vec<Feed> = match Feed::get_all(&mut conn) {
             Some(feeds) => feeds,
             None => {
@@ -44,14 +37,14 @@ pub async fn start(pool: DbPool) {
                     if response.status().is_success() {
                         log::info!("Got response for feed {}", feed.url);
                         let body = response.text().await.unwrap();
-                        parse_and_insert(&mut update_conn, &body, feed);
+                        parse_and_insert(&mut conn, &body, feed);
                     } else {
                         let error_update = PartialFeed {
                             error_time: Some(chrono::Utc::now().timestamp() as i32),
                             error_message: Some(response.status().to_string()),
                             ..Default::default()
                         };
-                        Feed::update(&mut update_conn, feed.id, &error_update);
+                        Feed::update(&mut conn, feed.id, &error_update);
                         log::warn!(
                             "Got non-success response for feed {}: {}",
                             feed.url,
@@ -65,7 +58,7 @@ pub async fn start(pool: DbPool) {
                         error_message: Some(e.to_string()),
                         ..Default::default()
                     };
-                    Feed::update(&mut update_conn, feed.id, &error_update);
+                    Feed::update(&mut conn, feed.id, &error_update);
                     log::warn!("Error getting feed {}: {:?}", feed.url, e);
                 }
             }
@@ -86,7 +79,7 @@ fn parse_and_insert(conn: &mut SqliteConnection, body: &str, feed: &Feed) {
     };
 
     // Update feed if necessary
-    let feed_updates = FeedUpdates::from_feed_rs(&parsed, &feed);
+    let feed_updates = FeedUpdates::from_feed_rs(&parsed, feed);
     if feed_updates.is_some() {
         log::info!("Found updates: {:?}, updating feed", feed_updates);
         Feed::update(conn, feed.id, &feed_updates.into());
