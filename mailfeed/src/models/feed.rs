@@ -98,10 +98,10 @@ impl<'a> Default for NewFeed<'a> {
 
 #[derive(Debug, Default, Serialize, Deserialize, AsChangeset)]
 #[diesel(table_name = feeds)]
-pub struct PartialFeed {
+pub struct PartialFeed<'a> {
     pub url: Option<String>,
     pub feed_type: Option<FeedType>,
-    pub title: Option<String>,
+    pub title: Option<&'a str>,
     pub last_checked: Option<i32>,
     pub last_updated: Option<i32>,
     pub error_time: Option<i32>,
