@@ -1,17 +1,15 @@
 use diesel::SqliteConnection;
-use tokio::time::Duration;
-
 use reqwest::Client;
 
+use super::types::FeedUpdates;
 use crate::{
     models::{
-        feed::{Feed, FeedType, PartialFeed},
+        feed::{Feed, PartialFeed},
         feed_item::NewFeedItem,
     },
+    tasks::types::CHECK_INTERVAL,
     DbPool,
 };
-
-pub const FEED_CHECK_INTERVAL: Duration = Duration::from_secs(60 * 5);
 
 pub async fn start(pool: DbPool) {
     let http_client = Client::new();
@@ -34,7 +32,7 @@ pub async fn start(pool: DbPool) {
             Some(feeds) => feeds,
             None => {
                 log::info!("No feeds found");
-                tokio::time::sleep(FEED_CHECK_INTERVAL).await;
+                tokio::time::sleep(CHECK_INTERVAL).await;
                 continue;
             }
         };
@@ -74,30 +72,11 @@ pub async fn start(pool: DbPool) {
         }
         let num_feeds = feeds.len();
         log::info!("Found {} feeds", num_feeds);
-        tokio::time::sleep(FEED_CHECK_INTERVAL).await;
-    }
-}
-
-#[derive(Debug, Default)]
-struct FeedUpdates {
-    feed_type: Option<FeedType>,
-    title: Option<String>,
-    last_updated: Option<i32>,
-}
-
-impl From<FeedUpdates> for PartialFeed {
-    fn from(updates: FeedUpdates) -> Self {
-        PartialFeed {
-            feed_type: updates.feed_type,
-            title: updates.title,
-            last_updated: updates.last_updated,
-            ..Default::default()
-        }
+        tokio::time::sleep(CHECK_INTERVAL).await;
     }
 }
 
 fn parse_and_insert(conn: &mut SqliteConnection, body: &str, feed: &Feed) {
-    let mut feed_updates = FeedUpdates::default();
     let parsed = match feed_rs::parser::parse(body.as_bytes()) {
         Ok(parsed) => parsed,
         Err(e) => {
@@ -105,48 +84,10 @@ fn parse_and_insert(conn: &mut SqliteConnection, body: &str, feed: &Feed) {
             return;
         }
     };
-    // update feed.feed_type if it is FeedType::Unknown
-    if feed.feed_type == FeedType::Unknown {
-        let feed_type = match parsed.feed_type {
-            feed_rs::model::FeedType::Atom => FeedType::Atom,
-            feed_rs::model::FeedType::RSS0 => FeedType::Rss,
-            feed_rs::model::FeedType::RSS1 => FeedType::Rss,
-            feed_rs::model::FeedType::RSS2 => FeedType::Rss,
-            feed_rs::model::FeedType::JSON => FeedType::JsonFeed,
-        };
-        feed_updates.feed_type = Some(feed_type);
-    }
 
-    // update feed.title if it is an empty string
-    if feed.title.is_empty() {
-        if let Some(title) = parsed.title {
-            feed_updates.title = Some(title.content);
-        }
-    }
-
-    // update feed.last_updated if parsed.updated is Some
-    if let Some(updated) = parsed.updated {
-        let mut last_updated = updated.timestamp() as i32;
-        let newest_item_ts = parsed
-            .entries
-            .first()
-            .map(|i| i.published.map(|p| p.timestamp() as i32));
-
-        if let Some(Some(newest_item_ts)) = newest_item_ts {
-            if newest_item_ts > last_updated {
-                last_updated = newest_item_ts;
-            }
-        }
-        if feed.last_updated != last_updated {
-            feed_updates.last_updated = Some(last_updated);
-        }
-    }
-    // only update the feed if there are some Some
-    // values in the updates
-    if feed_updates.feed_type.is_some()
-        || feed_updates.title.is_some()
-        || feed_updates.last_updated.is_some()
-    {
+    // Update feed if necessary
+    let feed_updates = FeedUpdates::from_feed_rs(&parsed, &feed);
+    if feed_updates.is_some() {
         log::info!("Found updates: {:?}, updating feed", feed_updates);
         Feed::update(conn, feed.id, &feed_updates.into());
     }

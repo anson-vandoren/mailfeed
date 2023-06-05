@@ -2,11 +2,10 @@ extern crate diesel;
 
 mod api;
 mod claims;
-mod email_sender;
-mod feed_monitor;
 mod global;
 mod models;
 mod schema;
+mod tasks;
 mod test_helpers;
 mod types;
 
@@ -173,8 +172,8 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
     log::info!("Serving static files from {}", public_path);
     log::info!("Starting server at http://127.0.0.1:{}", port);
 
-    tokio::spawn(feed_monitor::start(db_pool.clone()));
-    tokio::spawn(email_sender::start(db_pool.clone()));
+    tokio::spawn(tasks::feed_monitor::runner::start(db_pool.clone()));
+    tokio::spawn(tasks::email_sender::runner::start(db_pool.clone()));
 
     HttpServer::new(move || {
         App::new()

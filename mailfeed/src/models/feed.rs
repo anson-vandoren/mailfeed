@@ -16,9 +16,13 @@ pub struct Feed {
     pub url: String,
     pub feed_type: FeedType,
     pub title: String,
+    // TODO: update vv or remove
     pub last_checked: i32, // zero if never checked
+    // TODO: is vv actually used
     pub last_updated: i32,
+    // TODO: update vv
     pub error_time: i32, // zero if no error
+    // TODO: update vv
     pub error_message: Option<String>,
 }
 

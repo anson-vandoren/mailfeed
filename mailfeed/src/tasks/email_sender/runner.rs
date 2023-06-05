@@ -1,5 +1,15 @@
 use std::{env, fmt::Debug};
 
+use crate::{
+    models::{
+        feed::Feed,
+        feed_item::FeedItem,
+        subscription::{Frequency, PartialSubscription, Subscription},
+        user::User,
+    },
+    tasks::types::CHECK_INTERVAL,
+    DbPool,
+};
 use chrono::{TimeZone, Utc};
 use diesel::SqliteConnection;
 use lettre::{
@@ -7,17 +17,6 @@ use lettre::{
     message::{header::ContentType, MultiPart, SinglePart},
     transport::smtp::authentication::Credentials,
     Message, SmtpTransport, Transport,
-};
-
-use crate::{
-    feed_monitor::FEED_CHECK_INTERVAL,
-    models::{
-        feed::Feed,
-        feed_item::FeedItem,
-        subscription::{Frequency, PartialSubscription, Subscription},
-        user::User,
-    },
-    DbPool,
 };
 
 #[derive(Debug)]
@@ -61,7 +60,7 @@ pub async fn start(pool: DbPool) {
             Ok(conn) => conn,
             Err(e) => {
                 log::error!("Error getting DB connection: {:?}", e);
-                tokio::time::sleep(FEED_CHECK_INTERVAL).await;
+                tokio::time::sleep(CHECK_INTERVAL).await;
                 continue;
             }
         };
@@ -110,7 +109,7 @@ pub async fn start(pool: DbPool) {
             }
         }
 
-        tokio::time::sleep(FEED_CHECK_INTERVAL).await;
+        tokio::time::sleep(CHECK_INTERVAL).await;
     }
 }
 
