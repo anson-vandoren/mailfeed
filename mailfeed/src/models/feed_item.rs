@@ -104,6 +104,25 @@ impl FeedItem {
         }
     }
 
+    pub fn items_after(
+        conn: &mut SqliteConnection,
+        feed_id: i32,
+        time_after: i32,
+    ) -> Vec<FeedItem> {
+        use crate::schema::feed_items::dsl::{feed_id as fid, feed_items, pub_date};
+        match feed_items
+            .filter(fid.eq(feed_id))
+            .filter(pub_date.gt(time_after))
+            .load::<FeedItem>(conn)
+        {
+            Ok(items) => items,
+            Err(e) => {
+                log::warn!("Error getting feed items: {:?}", e);
+                Vec::new()
+            }
+        }
+    }
+
     pub fn has(conn: &mut SqliteConnection, item: &NewFeedItem) -> bool {
         use crate::schema::feed_items::dsl::{feed_id, feed_items, link, pub_date};
         feed_items

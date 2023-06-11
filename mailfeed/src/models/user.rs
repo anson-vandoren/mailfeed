@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct User {
     pub id: i32,
     pub login_email: String,
+    // TODO: optional name (for email sending)
     pub send_email: String,
     #[serde(skip_serializing)]
     pub password: String,

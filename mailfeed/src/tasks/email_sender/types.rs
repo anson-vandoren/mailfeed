@@ -1,5 +1,8 @@
 use std::env;
 
+use crate::models::feed_item::FeedItem;
+use lettre::{transport::smtp::authentication::Credentials, SmtpTransport};
+
 #[derive(Debug)]
 pub struct EmailServerCfg {
     pub host: String,
@@ -24,4 +27,36 @@ impl EmailServerCfg {
             from_email,
         }
     }
+
+    pub fn to_transport(&self) -> Result<SmtpTransport, lettre::transport::smtp::Error> {
+        SmtpTransport::relay(&self.host)
+            .map(|sender| {
+                sender.credentials(Credentials::new(
+                    self.username.clone(),
+                    self.password.clone(),
+                ))
+            })
+            .map(|sender| sender.build())
+    }
+}
+
+#[derive(Debug)]
+pub struct FeedData {
+    pub sub_id: i32,
+    pub new_items: Vec<FeedItem>,
+    pub feed_title: String,
+    pub feed_link: String,
+}
+
+#[derive(Debug)]
+pub struct EmailData {
+    pub feed_data: Vec<FeedData>,
+}
+
+pub type ToEmail<'a> = &'a str;
+pub type FromEmail<'a> = &'a str;
+
+pub struct MultiPartEmailContent<'a> {
+    pub as_html: &'a str,
+    pub as_plain: &'a str,
 }

@@ -12,6 +12,7 @@ mod types;
 use crate::claims::Claims;
 use crate::global::init_jwt_secret;
 use crate::models::user::{NewUser, PartialUser, User};
+use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::{middleware, web, App, HttpServer};
 use chrono::Utc;
@@ -176,12 +177,18 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
     tokio::spawn(tasks::email_sender::runner::start(db_pool.clone()));
 
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allow_any_method()
+            .allow_any_header()
+            .max_age(3600);
         App::new()
             .wrap(middleware::Logger::default())
             .wrap(middleware::Compress::default())
             .wrap(middleware::NormalizePath::new(
                 middleware::TrailingSlash::Trim,
             ))
+            .wrap(cors)
             .app_data(web::Data::new(db_pool.clone()))
             .service(api::routes())
             .service(Files::new("/", &public_path).index_file("index.html"))
