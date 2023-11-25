@@ -121,7 +121,7 @@ cargo run --release -- --create-admin
 - `GET /api/users` - List all users. Admin only.
 - `POST /api/users` - Create a new user. Admin only.
 - `GET /api/users/{id}` - Get a user by email. Admin or given user only.
-- `PUT /api/users/{id}` - Update a user. Admin or given user only.
+- `PATCH /api/users/{id}` - Update a user. Admin or given user only.
 - `DELETE /api/users/{id}` - Delete a user. Admin only.
 
 ### Authentication:
