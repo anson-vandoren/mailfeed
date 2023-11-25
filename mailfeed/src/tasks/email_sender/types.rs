@@ -14,11 +14,11 @@ pub struct EmailServerCfg {
 
 impl EmailServerCfg {
     pub fn from_env() -> Self {
-        let host = env::var("MF_SMTP_HOST").unwrap();
-        let port = env::var("MF_SMTP_PORT").unwrap().parse::<u16>().unwrap();
-        let username = env::var("MF_SMTP_USERNAME").unwrap();
-        let password = env::var("MF_SMTP_PASSWORD").unwrap();
-        let from_email = env::var("MF_FROM_EMAIL").unwrap();
+        let host = env::var("MF_SMTP_HOST").unwrap_or("".to_string());
+        let port = env::var("MF_SMTP_PORT").unwrap_or("".to_string()).parse::<u16>().unwrap_or(0);
+        let username = env::var("MF_SMTP_USERNAME").unwrap_or("".to_string());
+        let password = env::var("MF_SMTP_PASSWORD").unwrap_or("".to_string());
+        let from_email = env::var("MF_FROM_EMAIL").unwrap_or("".to_string());
         EmailServerCfg {
             host,
             port,
