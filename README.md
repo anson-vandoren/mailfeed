@@ -1,7 +1,7 @@
 # Mailfeed
 
 This project is a simple self-hosted service that allows a small number of users
-(primarily intended for just one, but can accomodate more) to subscribe to RSS or Atom
+(primarily intended for just one, but can accommodate more) to subscribe to RSS or Atom
 feeds and have them delivered to their email inbox.
 
 # Design notes
@@ -11,6 +11,12 @@ feeds and have them delivered to their email inbox.
 - Install Rust and Cargo
 - `cargo install diesel_cli --no-default-features --features "sqlite"`
 - `sudo apt install libsqlite3-dev`
+
+### Account setup
+
+```sh
+cargo run --release -- --create-admin
+```
 
 ## Data model
 
@@ -115,7 +121,7 @@ feeds and have them delivered to their email inbox.
 - `GET /api/users` - List all users. Admin only.
 - `POST /api/users` - Create a new user. Admin only.
 - `GET /api/users/{id}` - Get a user by email. Admin or given user only.
-- `PUT /api/users/{id}` - Update a user. Admin or given user only.
+- `PATCH /api/users/{id}` - Update a user. Admin or given user only.
 - `DELETE /api/users/{id}` - Delete a user. Admin only.
 
 ### Authentication:
