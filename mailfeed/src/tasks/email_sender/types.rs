@@ -10,6 +10,7 @@ pub struct EmailServerCfg {
     pub username: String,
     pub password: String,
     pub from_email: String,
+    pub email_subject: String,
 }
 
 impl EmailServerCfg {
@@ -19,12 +20,14 @@ impl EmailServerCfg {
         let username = env::var("MF_SMTP_USERNAME").unwrap();
         let password = env::var("MF_SMTP_PASSWORD").unwrap();
         let from_email = env::var("MF_FROM_EMAIL").unwrap();
+        let email_subject = env::var("MF_EMAIL_SUBJECT").unwrap_or("MailFeed Digest".to_string());
         EmailServerCfg {
             host,
             port,
             username,
             password,
             from_email,
+            email_subject,
         }
     }
 

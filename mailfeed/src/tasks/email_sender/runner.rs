@@ -58,7 +58,13 @@ pub async fn start(pool: DbPool) {
                     as_plain: &as_plain,
                     as_html: &as_html,
                 };
-                let message = construct_email(&user.send_email, &cfg.from_email, content);
+
+                let subject = &cfg.email_subject
+                    .replace("{feed_title}", &feed_data.feed_title)
+                    .replace("{feed_link}", &feed_data.feed_link)
+                    .replace("{sub_id}", &feed_data.sub_id.to_string())
+                    .replace("{new_items_count}", &feed_data.new_items.len().to_string());
+                let message = construct_email(subject, &user.send_email, &cfg.from_email, content);
                 let message = match message {
                     Ok(message) => message,
                     Err(e) => {
@@ -129,6 +135,7 @@ fn items_to_send_by_user(conn: &mut SqliteConnection, user_id: i32) -> EmailData
 }
 
 fn construct_email(
+    subject: &str,
     to_email: ToEmail,
     from_email: FromEmail,
     content: MultiPartEmailContent,
@@ -138,7 +145,7 @@ fn construct_email(
     Message::builder()
         .from(from_email.parse().unwrap())
         .to(to_email.parse().unwrap())
-        .subject("MailFeed Digest")
+        .subject(subject)
         .multipart(
             MultiPart::alternative()
                 .singlepart(
