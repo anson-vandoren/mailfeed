@@ -31,7 +31,17 @@ pub async fn start(pool: DbPool) {
         };
 
         for feed in &feeds {
-            let response = http_client.get(&feed.url).send().await;
+            let response = http_client.get(&feed.url)
+                // See: https://stackoverflow.com/a/7001617/5155484
+                .header(
+                    "Accept",
+                    "application/rss+xml, application/rdf+xml, application/atom+xml, application/feed+json, application/xml;q=0.9, text/xml;q=0.8"
+                )
+                .header(
+                    "User-Agent",
+                    "Mailfeed (https://github.com/anson-vandoren/mailfeed)"
+                )
+                .send().await;
             match response {
                 Ok(response) => {
                     if response.status().is_success() {
