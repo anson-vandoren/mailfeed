@@ -39,8 +39,7 @@ pub async fn get_all_subscriptions(
         Err(_) => return HttpResponse::InternalServerError().body("Error getting subscriptions"),
     };
 
-    let subscriptions_json = serde_json::to_string(&subscriptions).unwrap();
-    HttpResponse::Ok().body(subscriptions_json)
+    HttpResponse::Ok().json(subscriptions)
 }
 
 #[post("")]
@@ -124,8 +123,7 @@ pub async fn create_subscription(
 
     let res = SubscriptionResponse { subscription, feed };
 
-    let res_json = serde_json::to_string(&res).unwrap();
-    HttpResponse::Ok().body(res_json)
+    HttpResponse::Ok().json(res)
 }
 
 #[get("/{sub_id}")]

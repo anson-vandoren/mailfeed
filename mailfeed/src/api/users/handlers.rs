@@ -23,10 +23,7 @@ pub async fn get_all_users(pool: RqDbPool, claims: Claims) -> impl Responder {
     let users_result = User::get_all(&mut conn);
 
     match users_result {
-        Ok(users) => {
-            let users_json = serde_json::to_string(&users).unwrap();
-            HttpResponse::Ok().body(users_json)
-        }
+        Ok(users) => HttpResponse::Ok().json(users),
         Err(_) => HttpResponse::InternalServerError().body("Error getting users"),
     }
 }
@@ -50,8 +47,7 @@ pub async fn create_user(
         Ok(_) => {
             log::info!("created new user: {:?}", new_user.email);
             let user = User::get(&mut conn, UserQuery::Email(&new_user.email)).unwrap();
-            let user_json = serde_json::to_string(&user).unwrap();
-            HttpResponse::Ok().body(user_json)
+            HttpResponse::Ok().json(user)
         }
         Err(UserTableError::EmailExists) => HttpResponse::BadRequest().body("Email exists"),
         Err(UserTableError::PasswordTooShort) => {
@@ -87,8 +83,7 @@ pub async fn get_user(pool: RqDbPool, user_path: RqUserId, claims: Claims) -> im
         return HttpResponse::Forbidden().body("Forbidden");
     }
 
-    let user_json = serde_json::to_string(&user).unwrap();
-    HttpResponse::Ok().body(user_json)
+    HttpResponse::Ok().json(user)
 }
 
 #[patch("/{user_id}")]
@@ -136,8 +131,7 @@ pub async fn update_user(
         Err(_) => return HttpResponse::InternalServerError().body("Error updating user"),
     };
 
-    let user_json = serde_json::to_string(&updated_user).unwrap();
-    HttpResponse::Ok().body(user_json)
+    HttpResponse::Ok().json(updated_user)
 }
 
 #[delete("/{user_id}")]
