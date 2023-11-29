@@ -12,6 +12,11 @@ feeds and have them delivered to their email inbox.
 - `cargo install diesel_cli --no-default-features --features "sqlite"`
 - `sudo apt install libsqlite3-dev`
 
+### Set up environment variables
+
+- `cp ./mailfeed/.env.sample ./mailfeed/.env`
+- Edit environment variables as needed for your setup. At a minimum, you need SMTP details and a database path
+
 ### Account setup
 
 ```sh
