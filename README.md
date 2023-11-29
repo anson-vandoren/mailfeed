@@ -14,7 +14,7 @@ feeds and have them delivered to their email inbox.
 
 ### Set up environment variables
 
-- `cp ./mailfeed/.env.sample ./mailfeed/.env`
+- `cp ./mailfeed/.env.dist ./mailfeed/.env`
 - Edit environment variables as needed for your setup. At a minimum, you need SMTP details and a database path
 
 ### Account setup
