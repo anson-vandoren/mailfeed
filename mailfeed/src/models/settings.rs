@@ -39,6 +39,86 @@ pub enum Error {
 }
 
 impl Setting {
+    pub fn get_all_for_user(
+        conn: &mut SqliteConnection,
+        query_user_id: Option<i32>,
+    ) -> Result<Vec<Setting>, Error> {
+        use crate::schema::settings::dsl::*;
+
+        let settings_result = match query_user_id {
+            Some(uid) => settings
+                .filter(user_id.eq(uid))
+                .load::<Setting>(conn),
+            None => settings
+                .filter(user_id.is_null())
+                .load::<Setting>(conn),
+        };
+
+        settings_result.map_err(|_| Error::Database)
+    }
+
+    pub fn update(
+        conn: &mut SqliteConnection,
+        query_key: &str,
+        query_user_id: Option<i32>,
+        new_value: &str,
+    ) -> Result<Setting, Error> {
+        use crate::schema::settings::dsl::*;
+
+        let update_setting = UpdateSetting {
+            value: Some(new_value.to_string()),
+        };
+
+        let updated_setting = match query_user_id {
+            Some(uid) => diesel::update(
+                settings
+                    .filter(user_id.eq(uid))
+                    .filter(key.eq(query_key))
+            )
+            .set((
+                &update_setting,
+                updated_at.eq(chrono::Utc::now().timestamp() as i32),
+            ))
+            .get_result(conn),
+            None => diesel::update(
+                settings
+                    .filter(user_id.is_null())
+                    .filter(key.eq(query_key))
+            )
+            .set((
+                &update_setting,
+                updated_at.eq(chrono::Utc::now().timestamp() as i32),
+            ))
+            .get_result(conn),
+        };
+
+        updated_setting.map_err(|_| Error::SettingNotFound {
+            key: query_key.to_string(),
+            user_id: query_user_id,
+        })
+    }
+
+    pub fn set(
+        conn: &mut SqliteConnection,
+        query_key: &str,
+        query_user_id: Option<i32>,
+        new_value: &str,
+    ) -> Result<Setting, Error> {
+        // Try to update first, if it doesn't exist, create it
+        match Self::update(conn, query_key, query_user_id, new_value) {
+            Ok(setting) => Ok(setting),
+            Err(Error::SettingNotFound { .. }) => {
+                let new_setting = NewSetting {
+                    user_id: query_user_id,
+                    key: query_key.to_string(),
+                    value: new_value.to_string(),
+                };
+                Self::add(conn, &new_setting)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
     pub fn add(conn: &mut SqliteConnection, setting: &NewSetting) -> Result<Setting, Error> {
         use crate::schema::settings::dsl::*;
 

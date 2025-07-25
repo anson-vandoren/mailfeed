@@ -7,5 +7,6 @@ pub fn routes() -> Scope {
         .service(handlers::create_user)
         .service(handlers::get_user)
         .service(handlers::update_user)
+        .service(handlers::test_telegram)
         .service(handlers::delete_user)
 }

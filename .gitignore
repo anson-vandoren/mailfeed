@@ -1,3 +1,5 @@
 *.db
 .idea/
 public/
+mailfeed-ui/build/
+target/

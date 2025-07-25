@@ -1,12 +1,12 @@
 use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
 
-use super::types::{RqSubId, SubscriptionCreate, SubscriptionResponse};
+use super::types::{RqSubId, SubscriptionCreate, SubscriptionResponse, SubscriptionUpdate};
 use crate::{
     api::users::RqUserId,
     claims::Claims,
     models::{
         feed::{Feed, NewFeed},
-        subscription::{NewSubscription, Subscription},
+        subscription::{NewSubscription, PartialSubscription, Subscription},
     },
     RqDbPool,
 };
@@ -39,7 +39,18 @@ pub async fn get_all_subscriptions(
         Err(_) => return HttpResponse::InternalServerError().body("Error getting subscriptions"),
     };
 
-    HttpResponse::Ok().json(subscriptions)
+    // Enrich subscriptions with feed information
+    let mut enriched_subscriptions = Vec::new();
+    for subscription in subscriptions {
+        if let Some(feed) = Feed::get_by_id(&mut conn, subscription.feed_id) {
+            enriched_subscriptions.push(SubscriptionResponse {
+                subscription,
+                feed,
+            });
+        }
+    }
+
+    HttpResponse::Ok().json(enriched_subscriptions)
 }
 
 #[post("")]
@@ -132,8 +143,72 @@ pub async fn get_subscription() -> impl Responder {
 }
 
 #[patch("/{sub_id}")]
-pub async fn update_subscription() -> impl Responder {
-    HttpResponse::Ok().body("update_subscription")
+pub async fn update_subscription(
+    pool: RqDbPool,
+    user_path: RqUserId,
+    sub_path: RqSubId,
+    update_req: web::Json<SubscriptionUpdate>,
+    claims: Claims,
+) -> impl Responder {
+    let user_id = match user_path.user_id.parse::<i32>() {
+        Ok(id) => id,
+        Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),
+    };
+
+    if claims.sub != user_id {
+        return HttpResponse::Forbidden().body("Forbidden");
+    }
+
+    let sub_id = match sub_path.sub_id.parse::<i32>() {
+        Ok(id) => id,
+        Err(_) => return HttpResponse::BadRequest().body("Invalid subscription ID"),
+    };
+
+    let mut conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(err) => {
+            log::error!("Failed to get db connection from pool: {}", err);
+            return HttpResponse::InternalServerError().body("Error connecting to database");
+        }
+    };
+
+    // Verify subscription belongs to user
+    let subscription = match Subscription::get_by_id(&mut conn, sub_id) {
+        Some(sub) => sub,
+        None => return HttpResponse::NotFound().body("Subscription not found"),
+    };
+
+    if subscription.user_id != user_id {
+        return HttpResponse::Forbidden().body("Forbidden");
+    }
+
+    // Create partial update
+    let partial_update = PartialSubscription {
+        frequency: update_req.frequency,
+        friendly_name: update_req.friendly_name.clone(),
+        max_items: update_req.max_items,
+        is_active: update_req.is_active,
+        ..Default::default()
+    };
+
+    // Update subscription
+    let updated_subscription = match Subscription::update(&mut conn, sub_id, &partial_update) {
+        Some(sub) => sub,
+        None => return HttpResponse::InternalServerError().body("Error updating subscription"),
+    };
+
+    // Get feed information
+    let feed = match Feed::get_by_id(&mut conn, updated_subscription.feed_id) {
+        Some(feed) => feed,
+        None => return HttpResponse::InternalServerError().body("Error getting feed information"),
+    };
+
+    let response = SubscriptionResponse {
+        subscription: updated_subscription,
+        feed,
+    };
+
+    HttpResponse::Ok().json(response)
 }
 
 #[delete("/{sub_id}")]

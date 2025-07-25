@@ -44,10 +44,25 @@ pub async fn start(pool: DbPool) {
                 .send().await;
             match response {
                 Ok(response) => {
+                    // Update last_checked timestamp regardless of success/failure
+                    let last_checked_update = PartialFeed {
+                        last_checked: Some(chrono::Utc::now().timestamp() as i32),
+                        ..Default::default()
+                    };
+                    Feed::update(&mut conn, feed.id, &last_checked_update);
+                    
                     if response.status().is_success() {
                         log::info!("Got response for feed {}", feed.url);
                         let body = response.text().await.unwrap();
                         parse_and_insert(&mut conn, &body, feed);
+                        
+                        // Clear any previous errors on successful fetch
+                        let clear_error_update = PartialFeed {
+                            error_time: Some(0),
+                            error_message: Some("".to_string()),
+                            ..Default::default()
+                        };
+                        Feed::update(&mut conn, feed.id, &clear_error_update);
                     } else {
                         let error_update = PartialFeed {
                             error_time: Some(chrono::Utc::now().timestamp() as i32),
@@ -63,7 +78,9 @@ pub async fn start(pool: DbPool) {
                     }
                 }
                 Err(e) => {
+                    // Update last_checked and error info
                     let error_update = PartialFeed {
+                        last_checked: Some(chrono::Utc::now().timestamp() as i32),
                         error_time: Some(chrono::Utc::now().timestamp() as i32),
                         error_message: Some(e.to_string()),
                         ..Default::default()

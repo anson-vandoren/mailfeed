@@ -19,6 +19,7 @@ pub struct LoginRequest {
 pub struct TokenResponse<'a> {
     pub access_token: &'a str,
     pub refresh_token: &'a str,
+    pub user_id: i32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

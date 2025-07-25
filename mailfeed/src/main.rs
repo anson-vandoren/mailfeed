@@ -6,6 +6,7 @@ mod global;
 mod models;
 mod schema;
 mod tasks;
+mod telegram;
 mod test_helpers;
 mod types;
 
@@ -131,7 +132,7 @@ fn load_config() -> AppConfig {
         }
         Err(_) => {
             let mut path = env::current_dir().expect("Failed to get current directory");
-            path.push("public");
+            path.push("mailfeed-ui/build");
             let res = path.to_str().unwrap().to_string();
             log::info!("Using default public path: {}", res);
             res
@@ -174,7 +175,7 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
     log::info!("Starting server at http://127.0.0.1:{}", port);
 
     tokio::spawn(tasks::feed_monitor::runner::start(db_pool.clone()));
-    tokio::spawn(tasks::email_sender::runner::start(db_pool.clone()));
+    tokio::spawn(tasks::telegram_sender::runner::start(db_pool.clone()));
 
     HttpServer::new(move || {
         let cors = Cors::default()

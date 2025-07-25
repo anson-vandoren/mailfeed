@@ -1,4 +1,5 @@
 mod auth;
+mod config;
 mod feed_items;
 mod feeds;
 mod subscriptions;

@@ -57,6 +57,7 @@ pub async fn login(pool: RqDbPool, login_req: web::Json<LoginRequest>) -> impl R
     let response = TokenResponse {
         access_token: &access_token,
         refresh_token: &refresh_token,
+        user_id: user.id,
     };
 
     HttpResponse::Ok().json(response)
@@ -119,6 +120,7 @@ pub async fn refresh(pool: RqDbPool, refresh_req: web::Json<RefreshRequest>) -> 
     let response = TokenResponse {
         access_token: &new_access_token,
         refresh_token: &refresh_req.refresh_token,
+        user_id: user.id,
     };
 
     HttpResponse::Ok().json(response)

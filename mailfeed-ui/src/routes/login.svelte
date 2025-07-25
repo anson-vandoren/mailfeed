@@ -7,8 +7,8 @@
 
 	async function handleSubmit() {
 		const res = await login(email, password);
-		const { access_token, refresh_token } = await res.data;
-		user.set({ email, token: access_token, refresh: refresh_token });
+		const { access_token, refresh_token, user_id } = await res.data;
+		user.set({ email, token: access_token, refresh: refresh_token, userId: user_id });
 	}
 </script>
 

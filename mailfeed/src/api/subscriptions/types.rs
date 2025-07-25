@@ -27,3 +27,11 @@ pub struct SubscriptionResponse {
     pub subscription: Subscription,
     pub feed: Feed,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct SubscriptionUpdate {
+    pub frequency: Option<Frequency>,
+    pub friendly_name: Option<String>,
+    pub max_items: Option<i32>,
+    pub is_active: Option<bool>,
+}

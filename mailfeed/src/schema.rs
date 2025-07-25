@@ -50,6 +50,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    telegram_config (id) {
+        id -> Nullable<Integer>,
+        bot_token -> Text,
+        webhook_url -> Nullable<Text>,
+        created_at -> Integer,
+        updated_at -> Integer,
+    }
+}
+
+diesel::table! {
     users (id) {
         id -> Integer,
         login_email -> Text,
@@ -60,6 +70,8 @@ diesel::table! {
         daily_send_time -> Text,
         role -> Text,
         refresh_token -> Nullable<Text>,
+        telegram_chat_id -> Nullable<Text>,
+        telegram_username -> Nullable<Text>,
     }
 }
 
@@ -72,5 +84,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     feeds,
     settings,
     subscriptions,
+    telegram_config,
     users,
 );

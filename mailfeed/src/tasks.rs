@@ -1,4 +1,4 @@
 mod types;
 
-pub mod email_sender;
 pub mod feed_monitor;
+pub mod telegram_sender;

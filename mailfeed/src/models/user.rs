@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 pub struct User {
     pub id: i32,
     pub login_email: String,
-    // TODO: optional name (for email sending)
     pub send_email: String,
     #[serde(skip_serializing)]
     pub password: String,
@@ -21,6 +20,8 @@ pub struct User {
     pub role: String,            // CSV
     #[serde(skip_serializing)]
     pub refresh_token: Option<String>,
+    pub telegram_chat_id: Option<String>,
+    pub telegram_username: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Insertable, AsChangeset)]
@@ -36,6 +37,8 @@ pub struct InsertableUser {
     pub role: String,            // CSV
     #[serde(skip_serializing)]
     pub refresh_token: Option<String>,
+    pub telegram_chat_id: Option<String>,
+    pub telegram_username: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, AsChangeset)]
@@ -48,6 +51,8 @@ pub struct PartialUser {
     pub role: Option<String>,
     #[serde(skip_deserializing)]
     pub refresh_token: Option<String>,
+    pub telegram_chat_id: Option<String>,
+    pub telegram_username: Option<String>,
 }
 
 impl PartialUser {
@@ -57,6 +62,8 @@ impl PartialUser {
             && self.is_active.is_none()
             && self.daily_send_time.is_none()
             && self.role.is_none()
+            && self.telegram_chat_id.is_none()
+            && self.telegram_username.is_none()
     }
 }
 
@@ -125,6 +132,8 @@ impl User {
             daily_send_time: "00:00+00:00".into(),
             role: "user".into(),
             refresh_token: None,
+            telegram_chat_id: None,
+            telegram_username: None,
         };
 
         match diesel::insert_into(users).values(&user).get_result(conn) {

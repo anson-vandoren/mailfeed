@@ -1,5 +1,5 @@
 <script>
-	import '@skeletonlabs/skeleton/themes/theme-skeleton.css';
+	import '@skeletonlabs/skeleton/themes/theme-crimson.css';
 	import '@skeletonlabs/skeleton/styles/skeleton.css';
 	import { LightSwitch } from '@skeletonlabs/skeleton';
 	import '../app.postcss';
@@ -7,9 +7,8 @@
 	import { user } from '../stores';
 	import { logout } from '../api';
 
-	function doLogout() {
-		logout();
-		user.set({});
+	async function doLogout() {
+		await logout();
 	}
 </script>
 
@@ -22,6 +21,8 @@
 			<svelte:fragment slot="trail">
 				<LightSwitch />
 				{#if $user.token}
+					<a href="/config" class="btn-sm variant-outline-tertiary">Configuration</a>
+					<a href="/settings" class="btn-sm variant-outline-secondary">Settings</a>
 					<button on:click={doLogout} class="btn-sm variant-ghost-primary">Logout</button>
 				{/if}
 			</svelte:fragment>
