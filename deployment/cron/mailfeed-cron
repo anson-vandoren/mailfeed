@@ -1,0 +1,14 @@
+# Mailfeed Cron Jobs
+# Copy to /etc/cron.d/mailfeed-cron
+
+# Run health monitoring every 5 minutes
+*/5 * * * * root /opt/mailfeed/deployment/scripts/monitor.sh >/dev/null 2>&1
+
+# Daily maintenance at 2 AM
+0 2 * * * root /opt/mailfeed/deployment/scripts/maintenance.sh --all >/dev/null 2>&1
+
+# Weekly backup on Sundays at 3 AM
+0 3 * * 0 root /opt/mailfeed/deployment/scripts/backup.sh >/dev/null 2>&1
+
+# Clean up expired sessions every hour
+0 * * * * root /opt/mailfeed/deployment/scripts/maintenance.sh --sessions >/dev/null 2>&1

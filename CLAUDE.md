@@ -118,3 +118,8 @@ npm run format
 2. Include `Authorization: Bearer {access_token}` in API requests
 3. POST `/api/auth/refresh` with refresh_token to get new access_token
 4. POST `/api/auth/logout` to invalidate tokens
+
+# Dev Actions
+
+**Important: do not ever touch a file outside of the directory that this CLAUDE.md is in**
+

@@ -1,0 +1,41 @@
+[Unit]
+Description=Mailfeed RSS-to-Email Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=mailfeed
+Group=mailfeed
+WorkingDirectory=/opt/mailfeed
+ExecStart=/opt/mailfeed/bin/mailfeed
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/mailfeed/data /opt/mailfeed/logs
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Environment
+Environment=MF_DATABASE_URL=/opt/mailfeed/data/mailfeed.db
+Environment=MF_PUBLIC_PATH=/opt/mailfeed/public
+Environment=MF_PORT=8080
+Environment=LOG_LEVEL=info
+Environment=LOG_FORMAT=json
+Environment=RUST_LOG=mailfeed=info
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mailfeed
+
+[Install]
+WantedBy=multi-user.target
