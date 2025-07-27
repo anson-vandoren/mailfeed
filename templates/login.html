@@ -1,50 +1,293 @@
 {% extends "base.html" %}
 
-{% block title %}Login - Mailfeed{% endblock %}
+{% block title %}Sign in to MailFeed{% endblock %}
 
 {% block content %}
-<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem;">
-    <article style="width: 100%; max-width: 400px;">
-        <header style="text-align: center; margin-bottom: 2rem;">
-            <h1 style="margin-bottom: 0.5rem;">📰 MailFeed</h1>
-            <p style="color: var(--pico-muted-color); font-size: 0.875rem;">
-                RSS/Atom feeds delivered to your email
-            </p>
+<div class="login-container">
+    <div class="login-card">
+        <header class="login-header">
+            <div class="brand-section">
+                <span class="brand-icon">📰</span>
+                <h1>MailFeed</h1>
+            </div>
+            <p class="brand-tagline">RSS/Atom feeds delivered to your inbox</p>
         </header>
         
-        <form hx-post="/auth/login"
+        {% if let Some(err) = error %}
+        <div class="error-message" role="alert">
+            <span class="error-icon">⚠️</span>
+            <span>{{ err }}</span>
+        </div>
+        {% endif %}
+        
+        <form class="login-form"
+              hx-post="/auth/login"
               hx-target="#main"
-              hx-indicator="#login-spinner">
+              hx-indicator="#login-spinner"
+              autocomplete="on">
             
-            <label>
-                Email address
+            <div class="form-group">
+                <label for="email">Email address</label>
                 <input id="email" 
                        name="email" 
                        type="email" 
                        required 
-                       placeholder="Enter your email">
-            </label>
+                       autocomplete="email"
+                       placeholder="Enter your email address"
+                       class="login-input">
+            </div>
             
-            <label>
-                Password
+            <div class="form-group">
+                <label for="password">Password</label>
                 <input id="password" 
                        name="password" 
                        type="password" 
                        required 
-                       placeholder="Enter your password">
-            </label>
-
-            {% if let Some(err) = error %}
-            <div style="padding: 0.75rem; background: #fee2e2; border: 1px solid #ef4444; border-radius: var(--pico-border-radius); color: #991b1b; margin-bottom: 1rem;">
-                {{ err }}
+                       autocomplete="current-password"
+                       placeholder="Enter your password"
+                       class="login-input">
             </div>
-            {% endif %}
 
-            <button type="submit" style="width: 100%;">
-                <span id="login-spinner" class="htmx-indicator">⏳</span>
-                Sign in
+            <button type="submit" class="login-button" disabled id="login-btn">
+                <span id="login-spinner" class="login-spinner htmx-indicator">⏳</span>
+                <span class="login-text">Sign in</span>
             </button>
         </form>
-    </article>
+        
+        <footer class="login-footer">
+            <p>Welcome to MailFeed - Stay updated with your favorite feeds</p>
+        </footer>
+    </div>
 </div>
+
+<style>
+/* Login Page Specific Styles */
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--pico-primary-background) 0%, var(--pico-background-color) 100%);
+}
+
+.login-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--pico-card-background-color);
+    border-radius: 1rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    padding: 2.5rem;
+    border: 1px solid var(--pico-muted-border-color);
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.brand-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.brand-icon {
+    font-size: 2.5rem;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.login-header h1 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--pico-primary);
+    letter-spacing: -0.025em;
+}
+
+.brand-tagline {
+    margin: 0;
+    color: var(--pico-muted-color);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.error-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    border-radius: 0.75rem;
+    color: #991b1b;
+    margin-bottom: 1.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.error-icon {
+    font-size: 1.125rem;
+}
+
+.login-form {
+    margin-bottom: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--pico-color);
+    font-size: 0.875rem;
+}
+
+.login-input {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 2px solid var(--pico-muted-border-color);
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    background: var(--pico-background-color);
+    color: var(--pico-color);
+}
+
+.login-input:focus {
+    outline: none;
+    border-color: var(--pico-primary);
+    box-shadow: 0 0 0 3px var(--pico-primary-background);
+    transform: translateY(-1px);
+}
+
+.login-input::placeholder {
+    color: var(--pico-muted-color);
+}
+
+.login-button {
+    width: 100%;
+    padding: 1rem;
+    background: var(--pico-primary);
+    color: white;
+    border: none;
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+}
+
+.login-button:hover:not(:disabled) {
+    background: var(--pico-primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.login-button:active {
+    transform: translateY(0);
+}
+
+.login-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.login-spinner {
+    font-size: 1.125rem;
+}
+
+.login-text {
+    font-weight: 600;
+}
+
+.login-footer {
+    text-align: center;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--pico-muted-border-color);
+}
+
+.login-footer p {
+    margin: 0;
+    color: var(--pico-muted-color);
+    font-size: 0.8rem;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+    .login-card {
+        padding: 2rem 1.5rem;
+        margin: 0.5rem;
+        border-radius: 0.75rem;
+    }
+    
+    .brand-icon {
+        font-size: 2rem;
+    }
+    
+    .login-header h1 {
+        font-size: 1.75rem;
+    }
+    
+    .login-input {
+        padding: 0.75rem;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+}
+
+/* Loading state */
+.htmx-request .login-button {
+    pointer-events: none;
+}
+
+.htmx-request .login-text {
+    opacity: 0.7;
+}
+</style>
+
+<script>
+// Enhanced login form interactions
+document.addEventListener('DOMContentLoaded', function() {
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const loginButton = document.getElementById('login-btn');
+    
+    function updateButtonState() {
+        const emailValid = emailInput.value.trim().length > 0 && emailInput.validity.valid;
+        const passwordValid = passwordInput.value.trim().length > 0;
+        loginButton.disabled = !(emailValid && passwordValid);
+    }
+    
+    emailInput.addEventListener('input', updateButtonState);
+    passwordInput.addEventListener('input', updateButtonState);
+    
+    // Initial state check
+    updateButtonState();
+    
+    // Enhanced HTMX error handling
+    document.body.addEventListener('htmx:responseError', function(evt) {
+        const button = document.getElementById('login-btn');
+        button.disabled = false;
+        
+        // Show user-friendly error message
+        if (evt.detail.xhr.status >= 500) {
+            // Could add error message display here if needed
+        }
+    });
+    
+    // Focus management
+    emailInput.focus();
+});
+</script>
 {% endblock %}
