@@ -9,4 +9,4 @@ pub struct UserPath {
 }
 
 pub type RqUserId = web::Path<UserPath>;
-pub type RqPartUser = web::Json<PartialUser>;
+pub type RqPartUser = web::Form<PartialUser>;

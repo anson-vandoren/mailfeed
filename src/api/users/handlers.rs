@@ -120,7 +120,7 @@ pub async fn update_user(
     HttpResponse::Ok().json(updated_user)
 }
 
-#[get("/{user_id}/test-telegram")]
+#[post("/{user_id}/test-telegram")]
 pub async fn test_telegram(pool: RqDbPool, user_path: RqUserId, claims: SessionClaims) -> impl Responder {
     let id = match user_path.user_id.parse::<i32>() {
         Ok(id) => id,

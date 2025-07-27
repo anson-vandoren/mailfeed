@@ -138,11 +138,9 @@ fn load_config() -> AppConfig {
             path
         }
         Err(_) => {
-            let mut path = env::current_dir().expect("Failed to get current directory");
-            path.push("static");
-            let res = path.to_str().unwrap().to_string();
-            log::info!("Using default static path: {}", res);
-            res
+            let static_path = "./static";
+            log::info!("Using default static path: {}", static_path);
+            static_path.to_string()
         }
     };
     let db_path = match env::var("MF_DATABASE_URL") {
@@ -227,8 +225,8 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
                     .service(api::config::routes())
                     .service(api::feed_items::routes())
             )
+            .service(Files::new("/static", &public_path)) // Static files must come before web UI routes
             .service(web_ui::routes()) // Web UI routes
-            .service(Files::new("/static", &public_path))
     })
     .workers(1)
     .bind(("127.0.0.1", port))?

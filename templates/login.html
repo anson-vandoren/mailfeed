@@ -4,56 +4,47 @@
 
 {% block content %}
 <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem;">
-    <div class="card" style="width: 100%; max-width: 400px;">
-        <div style="text-align: center; margin-bottom: 2rem;">
-            <h2 class="h2" style="margin-bottom: 0.5rem;">
-                📰 MailFeed
-            </h2>
-            <p style="color: rgb(var(--color-surface-400)); font-size: 0.875rem;">
+    <article style="width: 100%; max-width: 400px;">
+        <header style="text-align: center; margin-bottom: 2rem;">
+            <h1 style="margin-bottom: 0.5rem;">📰 MailFeed</h1>
+            <p style="color: var(--pico-muted-color); font-size: 0.875rem;">
                 RSS/Atom feeds delivered to your email
             </p>
-        </div>
+        </header>
         
         <form hx-post="/auth/login"
               hx-target="#main"
-              hx-indicator="#login-spinner"
-              style="display: flex; flex-direction: column; gap: 1rem;">
+              hx-indicator="#login-spinner">
             
-            <div>
-                <label for="email" style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: rgb(var(--color-surface-300));">Email address</label>
+            <label>
+                Email address
                 <input id="email" 
                        name="email" 
                        type="email" 
                        required 
-                       class="input"
                        placeholder="Enter your email">
-            </div>
+            </label>
             
-            <div>
-                <label for="password" style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: rgb(var(--color-surface-300));">Password</label>
+            <label>
+                Password
                 <input id="password" 
                        name="password" 
                        type="password" 
                        required 
-                       class="input"
                        placeholder="Enter your password">
-            </div>
+            </label>
 
             {% if let Some(err) = error %}
-            <div class="variant-filled-error" style="padding: 0.75rem; border-radius: var(--theme-rounded-container);">
+            <div style="padding: 0.75rem; background: #fee2e2; border: 1px solid #ef4444; border-radius: var(--pico-border-radius); color: #991b1b; margin-bottom: 1rem;">
                 {{ err }}
             </div>
             {% endif %}
 
-            <button type="submit" 
-                    class="btn variant-filled-primary"
-                    style="width: 100%; margin-top: 0.5rem;">
-                <span id="login-spinner" class="htmx-indicator" style="margin-right: 0.5rem;">
-                    <div class="w-3 h-3 animate-spin rounded-full" style="border: 2px solid transparent; border-top: 2px solid currentColor;"></div>
-                </span>
+            <button type="submit" style="width: 100%;">
+                <span id="login-spinner" class="htmx-indicator">⏳</span>
                 Sign in
             </button>
         </form>
-    </div>
+    </article>
 </div>
 {% endblock %}

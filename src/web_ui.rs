@@ -549,13 +549,6 @@ struct SettingsTemplate {
 }
 
 
-#[derive(Template)]
-#[template(path = "config.html")]
-struct ConfigTemplate {
-    user_id: i32,
-    user_role: String,
-    telegram_bot_token: String,
-}
 
 /// Serve the settings page
 #[get("/settings")]
@@ -576,39 +569,6 @@ pub async fn settings_page(
         .body(template.render().unwrap()))
 }
 
-/// Serve the configuration page
-#[get("/config")]
-pub async fn config_page(
-    pool: RqDbPool,
-    claims: SessionClaims,
-) -> AppResult<HttpResponse> {
-    use crate::models::settings::Setting;
-    
-    let mut conn = pool.get().map_err(|_| AppError::ConnectionPoolError)?;
-    
-    // Get user details
-    let user = User::get(&mut conn, UserQuery::Id(claims.sub))
-        .ok_or(AppError::resource_not_found("User"))?;
-    
-    // Get telegram bot token (admin only)
-    let telegram_bot_token = if user.role == "admin" {
-        Setting::get(&mut conn, "telegram_bot_token", None)
-            .map(|s| if s.value.is_empty() { "".to_string() } else { "••••••••".to_string() })
-            .unwrap_or_default()
-    } else {
-        "".to_string()
-    };
-    
-    let template = ConfigTemplate {
-        user_id: claims.sub,
-        user_role: user.role,
-        telegram_bot_token,
-    };
-    
-    Ok(HttpResponse::Ok()
-        .content_type("text/html")
-        .body(template.render().unwrap()))
-}
 
 pub fn routes() -> actix_web::Scope {
     web::scope("")
@@ -617,7 +577,6 @@ pub fn routes() -> actix_web::Scope {
         .service(logout)
         .service(dashboard)
         .service(settings_page)
-        .service(config_page)
         .service(subscription_create)
         .service(subscription_edit_form)
         .service(subscription_view)

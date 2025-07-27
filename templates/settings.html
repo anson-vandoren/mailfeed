@@ -3,261 +3,244 @@
 {% block title %}Settings - Mailfeed{% endblock %}
 
 {% block content %}
-<div class="app-shell">
-    <!-- App Bar (Navigation) -->
-    <header class="app-bar">
-        <div class="app-bar-lead">
-            <a href="/dashboard" class="h2 flex items-center gap-2" style="text-decoration: none; color: inherit;">
-                📰 <span class="hidden sm:inline">MailFeed</span>
-            </a>
-        </div>
-        <div class="app-bar-trail">
-            <!-- Light Switch -->
-            <button onclick="toggleTheme()" class="lightswitch" title="Toggle theme">
-                <div class="lightswitch-thumb"></div>
+<nav class="main-nav" role="navigation" aria-label="Main navigation">
+    <div class="nav-container">
+        <a href="/dashboard" class="nav-brand" aria-label="MailFeed Dashboard">
+            <span class="brand-icon">📰</span>
+            <span>MailFeed</span>
+        </a>
+        
+        <div class="nav-actions">
+            <button onclick="toggleTheme()" 
+                    class="theme-toggle"
+                    aria-label="Toggle dark/light theme"
+                    title="Toggle theme">
+                <span class="nav-icon">🌓</span>
+                <span class="nav-text">Theme</span>
             </button>
             
-            <!-- Desktop navigation -->
-            <div class="hidden sm:flex items-center gap-2">
-                <a href="/dashboard" class="btn-sm variant-outline-primary">Dashboard</a>
-                <a href="/config" class="btn-sm variant-outline-tertiary">Configuration</a>
-                <button hx-post="/auth/logout" 
-                        hx-target="#main"
-                        class="btn-sm variant-ghost-primary">
-                    Logout
-                </button>
-            </div>
+            <a href="/dashboard" class="nav-link" aria-label="Dashboard">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-text">Dashboard</span>
+            </a>
+            
+            <button hx-post="/auth/logout" 
+                    hx-target="#main"
+                    hx-confirm="Are you sure you want to log out?"
+                    class="nav-button"
+                    aria-label="Logout">
+                <span class="nav-icon">🚪</span>
+                <span class="nav-text">Logout</span>
+            </button>
         </div>
-    </header>
+    </div>
+</nav>
 
     <!-- Main content -->
-    <main style="flex: 1; padding: 1.5rem;">
-        <div style="max-width: 800px; margin: 0 auto;">
-            <div class="card">
-                <!-- Header -->
-                <div class="card-header">
-                    <h1 class="h2 flex items-center gap-3">
-                        ⚙️ <span>User Settings</span>
-                    </h1>
-                    <p class="text-surface-500-400-token">Manage your personal settings and preferences</p>
-                </div>
+    <main class="container">
+        <h1>⚙️ User Settings</h1>
+        <p>Manage your personal settings and preferences</p>
 
-                <!-- Messages Area -->
-                <div id="settings-messages" class="px-6"></div>
+        <!-- Messages Area -->
+        <div id="settings-messages"></div>
 
-                <!-- Content -->
-                <div class="p-6 space-y-8">
-                    <!-- User Profile Section -->
-                    <div class="space-y-4">
-                        <h2 class="h3 flex items-center gap-2">
-                            👤 <span>Profile</span>
-                        </h2>
-                        
-                        <div class="card variant-ghost">
-                            <div class="p-4">
-                                <form hx-patch="/api/users/{{ user.id }}" 
-                                      hx-target="#settings-messages"
-                                      hx-swap="innerHTML"
-                                      class="space-y-4">
-                                    
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <label class="label">
-                                            <span class="font-semibold">Email Address</span>
-                                            <input type="email" 
-                                                   name="login_email" 
-                                                   value="{{ user.login_email }}"
-                                                   class="input"
-                                                   required>
-                                        </label>
+        <!-- User Profile Section -->
+        <section>
+            <h2>👤 Profile</h2>
+            
+            <form hx-patch="/api/users/{{ user.id }}" 
+                  hx-target="#settings-messages"
+                  hx-swap="innerHTML">
+                
+                <div class="grid">
+                    <label>
+                        Email Address
+                        <input type="email" 
+                               name="login_email" 
+                               value="{{ user.login_email }}"
+                               required>
+                    </label>
 
-                                        <div class="space-y-2">
-                                            <span class="font-semibold text-sm">Account Status</span>
-                                            <div class="badge {% if user.is_active %}variant-filled-success{% else %}variant-filled-error{% endif %}">
-                                                {% if user.is_active %}✅ Active{% else %}❌ Inactive{% endif %}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div class="space-y-2">
-                                            <span class="font-semibold text-sm">Role</span>
-                                            <div class="badge variant-filled-secondary">
-                                                {{ user.role }}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex justify-end pt-4">
-                                        <button type="submit" class="btn variant-filled-primary">
-                                            💾 Update Profile
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
+                    <div>
+                        <strong>Account Status:</strong>
+                        {% if user.is_active %}
+                            <span style="color: #10b981;">✅ Active</span>
+                        {% else %}
+                            <span style="color: #ef4444;">❌ Inactive</span>
+                        {% endif %}
                     </div>
 
-                    <!-- Telegram Integration Section -->
-                    <div class="space-y-4">
-                        <h2 class="h3 flex items-center gap-2">
-                            📱 <span>Telegram Integration</span>
-                        </h2>
-                        
-                        <div class="card variant-ghost">
-                            <div class="p-4">
-                                {% if let Some(chat_id) = user.telegram_chat_id %}
-                                <div class="space-y-4">
-                                    <div class="alert variant-filled-success">
-                                        <div class="alert-message">
-                                            <h3 class="h4">✅ Telegram Connected</h3>
-                                            <div class="space-y-1 text-sm">
-                                                <p><strong>Chat ID:</strong> <code class="code">{{ chat_id }}</code></p>
-                                                {% if let Some(username) = user.telegram_username %}
-                                                <p><strong>Username:</strong> @{{ username }}</p>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="flex flex-wrap gap-3">
-                                        <button hx-post="/api/users/{{ user.id }}/test-telegram"
-                                                hx-target="#settings-messages"
-                                                hx-swap="innerHTML"
-                                                class="btn variant-outline-primary">
-                                            🧪 Send Test Message
-                                        </button>
-                                        
-                                        <form hx-patch="/api/users/{{ user.id }}" 
-                                              hx-target="#settings-messages"
-                                              hx-swap="innerHTML"
-                                              class="inline">
-                                            <input type="hidden" name="telegram_chat_id" value="">
-                                            <input type="hidden" name="telegram_username" value="">
-                                            <button type="submit" class="btn variant-filled-error">
-                                                🔌 Disconnect Telegram
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                                {% else %}
-                                <div class="space-y-4">
-                                    <div class="alert variant-filled-warning">
-                                        <div class="alert-message">
-                                            <h3 class="h4">⚠️ Telegram Not Connected</h3>
-                                            <p>Connect your Telegram account to receive feed updates via Telegram.</p>
-                                            <div class="mt-2 text-sm">
-                                                <p><strong>How to connect:</strong></p>
-                                                <ol class="list-decimal list-inside space-y-1 ml-2">
-                                                    <li>Start a chat with your bot on Telegram</li>
-                                                    <li>Send any message to get your chat ID</li>
-                                                    <li>Enter the chat ID below</li>
-                                                </ol>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <form hx-patch="/api/users/{{ user.id }}" 
-                                          hx-target="#settings-messages"
-                                          hx-swap="innerHTML"
-                                          class="space-y-4">
-                                        
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <label class="label">
-                                                <span class="font-semibold">Telegram Chat ID *</span>
-                                                <input type="text" 
-                                                       name="telegram_chat_id" 
-                                                       placeholder="e.g., 123456789"
-                                                       class="input"
-                                                       pattern="[0-9-]+"
-                                                       title="Numeric chat ID"
-                                                       required>
-                                                <div class="text-xs text-surface-500-400-token mt-1">
-                                                    Send a message to your bot to get this ID
-                                                </div>
-                                            </label>
-
-                                            <label class="label">
-                                                <span class="font-semibold">Telegram Username</span>
-                                                <input type="text" 
-                                                       name="telegram_username" 
-                                                       placeholder="e.g., username"
-                                                       class="input">
-                                                <div class="text-xs text-surface-500-400-token mt-1">
-                                                    Optional - for display purposes only
-                                                </div>
-                                            </label>
-                                        </div>
-
-                                        <div class="flex justify-end pt-4">
-                                            <button type="submit" class="btn variant-filled-success">
-                                                🔗 Connect Telegram
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Security Section -->
-                    <div class="space-y-4">
-                        <h2 class="h3 flex items-center gap-2">
-                            🔒 <span>Security</span>
-                        </h2>
-                        
-                        <div class="card variant-ghost">
-                            <div class="p-4">
-                                <form hx-post="/api/auth/change_password" 
-                                      hx-target="#settings-messages"
-                                      hx-swap="innerHTML"
-                                      class="space-y-4">
-                                    
-                                    <div class="space-y-4">
-                                        <label class="label">
-                                            <span class="font-semibold">Current Password</span>
-                                            <input type="password" 
-                                                   name="current_password" 
-                                                   class="input"
-                                                   required>
-                                        </label>
-
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <label class="label">
-                                                <span class="font-semibold">New Password</span>
-                                                <input type="password" 
-                                                       name="new_password" 
-                                                       class="input"
-                                                       minlength="8"
-                                                       required>
-                                                <div class="text-xs text-surface-500-400-token mt-1">
-                                                    Minimum 8 characters
-                                                </div>
-                                            </label>
-
-                                            <label class="label">
-                                                <span class="font-semibold">Confirm New Password</span>
-                                                <input type="password" 
-                                                       name="confirm_password" 
-                                                       class="input"
-                                                       minlength="8"
-                                                       required>
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex justify-end pt-4">
-                                        <button type="submit" class="btn variant-filled-primary">
-                                            🔑 Change Password
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
+                    <div>
+                        <strong>Role:</strong> {{ user.role }}
                     </div>
                 </div>
+
+                <button type="submit">💾 Update Profile</button>
+            </form>
+        </section>
+
+        <!-- Telegram Integration Section -->
+        <section>
+            <h2>📱 Telegram Integration</h2>
+            
+            {% if let Some(chat_id) = user.telegram_chat_id %}
+            <div>
+                <div style="padding: 1rem; background: #d1fae5; border: 1px solid #10b981; border-radius: var(--pico-border-radius); margin-bottom: 1rem;">
+                    <h4 style="margin: 0 0 0.5rem 0; color: #065f46;">✅ Telegram Connected</h4>
+                    <p style="margin: 0; font-size: 0.875rem; color: #047857;">
+                        <strong>Chat ID:</strong> <code>{{ chat_id }}</code><br>
+                        {% if let Some(username) = user.telegram_username %}
+                        <strong>Username:</strong> @{{ username }}
+                        {% endif %}
+                    </p>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button hx-post="/api/users/{{ user.id }}/test-telegram"
+                            hx-target="#settings-messages"
+                            hx-swap="innerHTML"
+                            class="secondary">
+                        🧪 Send Test Message
+                    </button>
+                    
+                    <button onclick="document.getElementById('telegram-edit-form').style.display = 'block'; this.style.display = 'none';"
+                            class="secondary">
+                        ✏️ Edit Settings
+                    </button>
+                    
+                    <form hx-patch="/api/users/{{ user.id }}" 
+                          hx-target="#settings-messages"
+                          hx-swap="innerHTML"
+                          style="display: inline;">
+                        <input type="hidden" name="telegram_chat_id" value="">
+                        <input type="hidden" name="telegram_username" value="">
+                        <button type="submit" class="contrast">
+                            🔌 Disconnect Telegram
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Edit form (hidden by default) -->
+                <form id="telegram-edit-form" 
+                      hx-patch="/api/users/{{ user.id }}" 
+                      hx-target="#settings-messages"
+                      hx-swap="innerHTML"
+                      style="display: none; margin-top: 1rem; padding: 1rem; border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius);">
+                    
+                    <h4 style="margin: 0 0 1rem 0;">Edit Telegram Settings</h4>
+                    
+                    <div class="grid">
+                        <label>
+                            Telegram Chat ID *
+                            <input type="text" 
+                                   name="telegram_chat_id" 
+                                   value="{{ chat_id }}"
+                                   placeholder="e.g., 123456789"
+                                   pattern="[0-9\-]+"
+                                   title="Numeric chat ID"
+                                   required>
+                            <small>Send a message to your bot to get this ID</small>
+                        </label>
+
+                        <label>
+                            Telegram Username
+                            <input type="text" 
+                                   name="telegram_username" 
+                                   value="{% if let Some(username) = user.telegram_username %}{{ username }}{% endif %}"
+                                   placeholder="e.g., username">
+                            <small>Optional - for display purposes only</small>
+                        </label>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                        <button type="submit">💾 Update Settings</button>
+                        <button type="button" 
+                                onclick="document.getElementById('telegram-edit-form').style.display = 'none';"
+                                class="secondary">
+                            ✖️ Cancel
+                        </button>
+                    </div>
+                </form>
             </div>
-        </div>
+            {% else %}
+            <div>
+                <div style="padding: 1rem; background: #fef3c7; border: 1px solid #f59e0b; border-radius: var(--pico-border-radius); margin-bottom: 1rem;">
+                    <h4 style="margin: 0 0 0.5rem 0; color: #92400e;">⚠️ Telegram Not Connected</h4>
+                    <p style="margin: 0 0 0.5rem 0; color: #92400e;">Connect your Telegram account to receive feed updates via Telegram.</p>
+                    <div style="font-size: 0.875rem; color: #92400e;">
+                        <p><strong>How to connect:</strong></p>
+                        <ol style="margin: 0.5rem 0 0 1.5rem;">
+                            <li>Start a chat with your bot on Telegram</li>
+                            <li>Send any message to get your chat ID</li>
+                            <li>Enter the chat ID below</li>
+                        </ol>
+                    </div>
+                </div>
+                
+                <form hx-patch="/api/users/{{ user.id }}" 
+                      hx-target="#settings-messages"
+                      hx-swap="innerHTML">
+                    
+                    <div class="grid">
+                        <label>
+                            Telegram Chat ID *
+                            <input type="text" 
+                                   name="telegram_chat_id" 
+                                   placeholder="e.g., 123456789"
+                                   pattern="[0-9-]+"
+                                   title="Numeric chat ID"
+                                   required>
+                            <small>Send a message to your bot to get this ID</small>
+                        </label>
+
+                        <label>
+                            Telegram Username
+                            <input type="text" 
+                                   name="telegram_username" 
+                                   placeholder="e.g., username">
+                            <small>Optional - for display purposes only</small>
+                        </label>
+                    </div>
+
+                    <button type="submit">🔗 Connect Telegram</button>
+                </form>
+            </div>
+            {% endif %}
+        </section>
+
+        <!-- System Configuration (Admin Only) -->
+        {% if user.role == "admin" %}
+        <section>
+            <h2>🔧 System Configuration</h2>
+            
+            <div style="padding: 1rem; background: #fef3c7; border: 1px solid #f59e0b; border-radius: var(--pico-border-radius); margin-bottom: 1rem;">
+                <h4 style="margin: 0 0 0.5rem 0; color: #92400e;">⚠️ Admin Only</h4>
+                <p style="margin: 0; color: #92400e;">These settings affect the entire system and require admin privileges.</p>
+            </div>
+            
+            <div>
+                <h3>🤖 Telegram Bot Token</h3>
+                <p>Bot token for system-wide Telegram integration. Get this from <a href="https://t.me/BotFather" target="_blank">@BotFather</a>.</p>
+                
+                <form hx-patch="/api/config/telegram_bot_token"
+                      hx-target="#settings-messages"
+                      hx-swap="innerHTML">
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; align-items: end;">
+                        <input type="password"
+                               name="value"
+                               placeholder="Bot token from @BotFather"
+                               pattern="[0-9]+:[A-Za-z0-9_\-]+"
+                               title="Format: 123456789:ABCdefGHIjklMNOpqrSTUvwxyz">
+                        <button type="submit">💾 Save Token</button>
+                    </div>
+                    
+                    <div style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--pico-muted-color);">
+                        Enter the bot token to enable Telegram integration for all users
+                    </div>
+                </form>
+            </div>
+        </section>
+        {% endif %}
+
     </main>
-</div>
 {% endblock %}

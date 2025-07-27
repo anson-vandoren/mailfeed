@@ -5,7 +5,6 @@ use super::types::{
     ConfigBulkUpdate, ConfigItem, ConfigResponse, ConfigUpdate, get_config_schemas,
 };
 use crate::{
-    api::users::RqUserId,
     session::SessionClaims,
     models::settings::Setting,
     RqDbPool,
@@ -14,17 +13,9 @@ use crate::{
 #[get("")]
 pub async fn get_user_config(
     pool: RqDbPool,
-    path: RqUserId,
     claims: SessionClaims,
 ) -> impl Responder {
-    let user_id = match path.user_id.parse::<i32>() {
-        Ok(id) => id,
-        Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),
-    };
-
-    if claims.sub != user_id {
-        return HttpResponse::Forbidden().body("Forbidden");
-    }
+    let user_id = claims.sub;
 
     let mut conn = match pool.get() {
         Ok(conn) => conn,
@@ -108,28 +99,32 @@ pub async fn get_user_config(
 #[patch("/{config_key}")]
 pub async fn update_user_config(
     pool: RqDbPool,
-    user_path: RqUserId,
-    config_path: web::Path<String>, // config_key
-    update_req: web::Json<ConfigUpdate>,
+    path: web::Path<String>, // config_key
+    update_req: web::Form<ConfigUpdate>,
     claims: SessionClaims,
 ) -> impl Responder {
-    let config_key = config_path.into_inner();
-    let user_id_str = &user_path.user_id;
-    
-    let user_id = match user_id_str.parse::<i32>() {
-        Ok(id) => id,
-        Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),
-    };
-
-    if claims.sub != user_id {
-        return HttpResponse::Forbidden().body("Forbidden");
-    }
+    let config_key = path.into_inner();
+    let user_id = claims.sub;
 
     // Validate that this is a known configuration key
     let schemas = get_config_schemas();
     let schema = match schemas.iter().find(|s| s.key == config_key) {
         Some(schema) => schema,
         None => return HttpResponse::BadRequest().body("Invalid configuration key"),
+    };
+
+    // For system settings like telegram_bot_token, require admin role and save as system setting
+    let setting_user_id = if config_key == "telegram_bot_token" {
+        if claims.role != "admin" {
+            return HttpResponse::Forbidden().body("Admin access required for system settings");
+        }
+        None // System-wide setting
+    } else {
+        // User-specific setting
+        if claims.sub != user_id {
+            return HttpResponse::Forbidden().body("Forbidden");
+        }
+        Some(user_id)
     };
 
     // Validate the value according to the schema
@@ -146,7 +141,7 @@ pub async fn update_user_config(
     };
 
     // Update or create the setting
-    match Setting::set(&mut conn, &config_key, Some(user_id), &update_req.value) {
+    match Setting::set(&mut conn, &config_key, setting_user_id, &update_req.value) {
         Ok(setting) => {
             let config_item = ConfigItem {
                 key: setting.key,
@@ -165,18 +160,10 @@ pub async fn update_user_config(
 #[post("/bulk")]
 pub async fn bulk_update_user_config(
     pool: RqDbPool,
-    path: RqUserId,
     bulk_update: web::Json<ConfigBulkUpdate>,
     claims: SessionClaims,
 ) -> impl Responder {
-    let user_id = match path.user_id.parse::<i32>() {
-        Ok(id) => id,
-        Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),
-    };
-
-    if claims.sub != user_id {
-        return HttpResponse::Forbidden().body("Forbidden");
-    }
+    let user_id = claims.sub;
 
     let schemas = get_config_schemas();
     let mut updated_configs = HashMap::new();

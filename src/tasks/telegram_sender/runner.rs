@@ -194,20 +194,28 @@ fn format_telegram_message(feed_data: &FeedData) -> String {
     // Telegram message length limit is 4096 characters
     // Be more conservative to avoid cutting off HTML tags
     if message.len() > 3900 {
-        // Find a safe truncation point that doesn't break HTML tags
-        let mut truncate_pos = 3900;
-        while truncate_pos > 0 && !message.is_char_boundary(truncate_pos) {
-            truncate_pos -= 1;
+        // Find the last complete feed item boundary (─────────────) to avoid cutting HTML
+        let separator = "─────────────\n";
+        let mut safe_truncate_pos = 3900;
+        
+        // Find UTF-8 boundary first
+        while safe_truncate_pos > 0 && !message.is_char_boundary(safe_truncate_pos) {
+            safe_truncate_pos -= 1;
         }
         
-        // Find the last newline before truncation point to avoid breaking HTML
-        while truncate_pos > 0 && message.chars().nth(truncate_pos) != Some('\n') {
-            truncate_pos -= 1;
-        }
-        
-        if truncate_pos > 0 {
-            message.truncate(truncate_pos);
-            message.push_str("\n\n<i>... message truncated ...</i>");
+        // Now find the last separator before this position
+        if let Some(last_separator) = message[..safe_truncate_pos].rfind(separator) {
+            message.truncate(last_separator + separator.len());
+            message.push_str("<i>... more items truncated ...</i>");
+        } else {
+            // Fallback: find last complete newline
+            while safe_truncate_pos > 0 && message.chars().nth(safe_truncate_pos) != Some('\n') {
+                safe_truncate_pos -= 1;
+            }
+            if safe_truncate_pos > 0 {
+                message.truncate(safe_truncate_pos);
+                message.push_str("\n\n<i>... message truncated ...</i>");
+            }
         }
     }
 

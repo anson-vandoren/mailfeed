@@ -241,6 +241,22 @@ pub fn get_config_schemas() -> Vec<ConfigSchema> {
             }),
             options: None,
         },
+        // System Settings
+        ConfigSchema {
+            key: "telegram_bot_token".to_string(),
+            display_name: "Telegram Bot Token".to_string(),
+            description: "Bot token for Telegram integration. Get this from @BotFather on Telegram.".to_string(),
+            config_type: ConfigType::String,
+            category: ConfigCategory::System,
+            default_value: "".to_string(),
+            validation: Some(ConfigValidation {
+                min: None,
+                max: Some(100),
+                pattern: Some("^[0-9]+:[A-Za-z0-9_-]+$".to_string()),
+                required: false,
+            }),
+            options: None,
+        },
         // Authentication Settings
         ConfigSchema {
             key: "jwt_access_token_duration_minutes".to_string(),
