@@ -1,6 +1,7 @@
 use super::types::{TelegramConfig, TelegramMessage, TelegramResponse};
 use reqwest::Client;
 use std::error::Error;
+use diesel::SqliteConnection;
 
 pub struct TelegramClient {
     client: Client,
@@ -8,8 +9,8 @@ pub struct TelegramClient {
 }
 
 impl TelegramClient {
-    pub fn new() -> Result<Self, Box<dyn Error>> {
-        let config = TelegramConfig::from_env();
+    pub fn new(conn: &mut SqliteConnection) -> Result<Self, Box<dyn Error>> {
+        let config = TelegramConfig::from_database(conn)?;
         let client = Client::new();
         
         Ok(Self { client, config })

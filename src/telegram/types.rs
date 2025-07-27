@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use crate::models::settings::Setting;
+use diesel::SqliteConnection;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TelegramMessage {
@@ -25,17 +27,17 @@ pub struct TelegramConfig {
 }
 
 impl TelegramConfig {
-    pub fn from_env() -> Self {
-        let bot_token = std::env::var("TELEGRAM_BOT_TOKEN")
-            .expect("TELEGRAM_BOT_TOKEN environment variable must be set");
+    pub fn from_database(conn: &mut SqliteConnection) -> Result<Self, Box<dyn std::error::Error>> {
+        let bot_token = Setting::get(conn, "telegram_bot_token", None)?.value;
 
-        let api_base_url = std::env::var("TELEGRAM_API_BASE_URL")
+        let api_base_url = Setting::get(conn, "telegram_api_base_url", None)
+            .map(|s| s.value)
             .unwrap_or_else(|_| "https://api.telegram.org".to_string());
 
-        Self {
+        Ok(Self {
             bot_token,
             api_base_url,
-        }
+        })
     }
 
     pub fn send_message_url(&self) -> String {

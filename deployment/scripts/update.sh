@@ -44,11 +44,12 @@ chown mailfeed:mailfeed "$INSTALL_DIR/bin/mailfeed.new"
 # Atomic replace
 mv "$INSTALL_DIR/bin/mailfeed.new" "$INSTALL_DIR/bin/mailfeed"
 
-# Update frontend if available
-if [[ -d "./mailfeed-ui/build" ]]; then
-    echo "🎨 Updating frontend files..."
+# Update static files if available
+if [[ -d "./static" ]]; then
+    echo "🎨 Updating static files..."
     rm -rf "$INSTALL_DIR/public.new"
-    cp -r ./mailfeed-ui/build "$INSTALL_DIR/public.new"
+    mkdir -p "$INSTALL_DIR/public.new"
+    cp -r ./static/* "$INSTALL_DIR/public.new/"
     chown -R mailfeed:mailfeed "$INSTALL_DIR/public.new"
     
     # Atomic replace

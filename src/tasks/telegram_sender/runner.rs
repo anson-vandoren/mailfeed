@@ -14,23 +14,24 @@ use chrono::{TimeZone, Utc};
 use diesel::SqliteConnection;
 
 pub async fn start(pool: DbPool) {
-    // Initialize Telegram client
-    let telegram_client = match TelegramClient::new() {
-        Ok(client) => client,
-        Err(e) => {
-            log::error!("Error creating Telegram client: {:?}", e);
-            return;
-        }
-    };
-
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
     loop {
         interval.tick().await;
+        
         let mut conn = match pool.get() {
             Ok(conn) => conn,
             Err(e) => {
                 log::error!("Error getting DB connection: {:?}", e);
                 continue;
+            }
+        };
+        
+        // Try to initialize Telegram client each time - allows for runtime configuration
+        let telegram_client = match TelegramClient::new(&mut conn) {
+            Ok(client) => client,
+            Err(e) => {
+                log::debug!("Telegram client not available (no token configured?): {:?}", e);
+                continue; // Skip this iteration, try again next time
             }
         };
 

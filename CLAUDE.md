@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Mailfeed is a self-hosted RSS/Atom feed-to-email service built with Rust (backend) and SvelteKit (frontend). It allows users to subscribe to feeds and receive them as emails on configurable schedules (realtime, hourly, daily).
+Mailfeed is a self-hosted RSS/Atom feed-to-email service built with Rust (backend) and HTMX + Askama templates (frontend). It allows users to subscribe to feeds and receive them as emails on configurable schedules (realtime, hourly, daily).
 
 ## Development Commands
 
@@ -38,35 +38,17 @@ diesel migration run    # Apply pending migrations
 diesel migration revert # Revert last migration
 ```
 
-### Frontend (SvelteKit)
-```bash
-# Navigate to frontend directory
-cd mailfeed-ui
+### Frontend (HTMX + Askama)
+The frontend is now server-side rendered using Askama templates with HTMX for interactivity. Templates are located in the `templates/` directory and static assets in `static/`.
 
-# Development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Type checking
-npm run check
-npm run check:watch
-
-# Linting and formatting
-npm run lint
-npm run format
-```
+No build step required - templates are compiled at runtime by the Rust backend.
 
 ## Architecture Overview
 
 ### Backend Structure (Rust + Actix Web)
 - **Entry Point**: `src/main.rs` - Server setup, CLI commands, database initialization
 - **API Layer**: `src/api/` - RESTful endpoints organized by resource
-  - `auth/` - JWT-based authentication (login/logout/refresh)
+  - `auth/` - Session-based authentication (login/logout)
   - `users/` - User management (CRUD operations)
   - `feeds/` - Feed management (admin only)
   - `subscriptions/` - User subscription management
@@ -76,21 +58,22 @@ npm run format
 - **Background Tasks**: `src/tasks/` - Async workers
   - `feed_monitor/` - Polls feeds for updates (~5min intervals)  
   - `email_sender/` - Sends scheduled emails based on subscription frequency
-- **Auth**: JWT tokens with access/refresh token pattern
+- **Auth**: Session-based authentication with cookies
+- **Web UI**: `src/web_ui.rs` - HTMX endpoints serving Askama templates
 
-### Frontend Structure (SvelteKit + TypeScript)
-- **API Client**: `src/api/index.ts` - Axios-based API calls to backend
-- **State Management**: `src/stores.ts` - Svelte stores with localStorage persistence
-- **Authentication**: JWT token stored in localStorage, used in API headers
-- **UI Framework**: Skeleton UI components with Tailwind CSS
-- **Routing**: SvelteKit file-based routing
+### Frontend Structure (HTMX + Askama)
+- **Templates**: `templates/` - Server-side rendered HTML with Askama
+- **Static Assets**: `static/` - Favicon, fonts, and other static files
+- **Authentication**: Session cookies managed by server
+- **UI Styling**: Skeleton UI classes embedded in base template
+- **Interactivity**: HTMX for dynamic content updates
 
 ### Key Data Flow
-1. Users authenticate → JWT tokens stored in frontend
+1. Users authenticate → Session cookies set by server
 2. Feed subscriptions created → stored in database with user association
 3. Background `feed_monitor` polls RSS/Atom feeds → updates `feed_items` table
 4. Background `email_sender` checks schedules → sends emails based on subscription frequency
-5. Frontend communicates with backend via REST API with JWT authentication
+5. Frontend communicates with backend via HTMX requests and REST API with session authentication
 
 ### Database Schema (SQLite + Diesel)
 - `users` - User accounts with roles (admin/user), email settings
@@ -103,7 +86,7 @@ npm run format
 
 ### Environment Variables
 - `MF_DATABASE_URL` - SQLite database path (default: `./mailfeed.db`)
-- `MF_PUBLIC_PATH` - Static file serving directory (default: `./public`)
+- `MF_PUBLIC_PATH` - Static file serving directory (default: `./static`)
 - `MF_PORT` - Server port (default: 8080)
 
 ### Development Setup Requirements
@@ -114,7 +97,7 @@ npm run format
 
 ## API Design Patterns
 - RESTful endpoints with resource-based organization
-- JWT authentication with Bearer tokens
+- Session-based authentication with secure cookies
 - Admin vs user role-based access control
 - Database connection pooling (r2d2)
 - CORS enabled for cross-origin requests
@@ -122,10 +105,9 @@ npm run format
 - Structured error handling with appropriate HTTP status codes
 
 ## Authentication Flow
-1. POST `/api/auth/login` → returns access_token + refresh_token
-2. Include `Authorization: Bearer {access_token}` in API requests
-3. POST `/api/auth/refresh` with refresh_token to get new access_token
-4. POST `/api/auth/logout` to invalidate tokens
+1. POST `/api/auth/login` → sets secure session cookie
+2. Session cookie automatically included in subsequent requests
+3. POST `/api/auth/logout` to clear session cookie and invalidate server-side session
 
 # Dev Actions
 

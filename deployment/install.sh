@@ -38,10 +38,10 @@ else
     exit 1
 fi
 
-# Copy frontend files (if they exist)
-if [[ -d "./mailfeed-ui/build" ]]; then
-    echo "🎨 Installing frontend files..."
-    cp -r ./mailfeed-ui/build/* "$INSTALL_DIR/public/"
+# Copy static files (if they exist)
+if [[ -d "./static" ]]; then
+    echo "🎨 Installing static files..."
+    cp -r ./static/* "$INSTALL_DIR/public/"
     chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/public"
 fi
 

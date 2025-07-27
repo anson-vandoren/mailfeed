@@ -53,7 +53,7 @@ fn main() -> std::io::Result<()> {
     let config = load_config();
 
     let db_pool = initialize_db_pool(config.db_path);
-    tracing::info!("Running database migrations");
+    log::info!("Running database migrations");
     let mut conn = db_pool.get().expect("Failed to get database connection");
     conn.run_pending_migrations(MIGRATIONS)
         .expect("Failed to run migrations");
@@ -139,9 +139,9 @@ fn load_config() -> AppConfig {
         }
         Err(_) => {
             let mut path = env::current_dir().expect("Failed to get current directory");
-            path.push("mailfeed-ui/build");
+            path.push("static");
             let res = path.to_str().unwrap().to_string();
-            log::info!("Using default public path: {}", res);
+            log::info!("Using default static path: {}", res);
             res
         }
     };
@@ -178,8 +178,8 @@ fn load_config() -> AppConfig {
 
 #[actix_web::main]
 async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io::Result<()> {
-    tracing::info!("Serving static files from {}", public_path);
-    tracing::info!("Starting server at http://127.0.0.1:{}", port);
+    log::info!("Serving static files from {}", public_path);
+    log::info!("Starting server at http://127.0.0.1:{}", port);
     
     // Initialize metrics
     // Removed metrics - keeping simple

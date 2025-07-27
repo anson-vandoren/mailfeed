@@ -6,13 +6,8 @@ This directory contains deployment configuration for Mailfeed as a standalone bi
 
 1. **Build the application:**
    ```bash
-   # Backend
+   # Build the complete application (backend + HTMX templates + static assets)
    cargo build --release
-   
-   # Frontend
-   cd mailfeed-ui
-   npm run build
-   cd ..
    ```
 
 2. **Install:**
@@ -50,7 +45,7 @@ The installation script creates:
   - `bin/` - Application binary
   - `data/` - SQLite database
   - `config/` - Configuration files
-  - `public/` - Frontend assets
+  - `public/` - Static assets (favicon, fonts)
   - `logs/` - Application logs
 - Systemd service: `mailfeed.service`
 - Log rotation: `/etc/logrotate.d/mailfeed`
@@ -147,7 +142,6 @@ sudo /opt/mailfeed/deployment/scripts/maintenance.sh --report
 ```bash
 # Build new version
 cargo build --release
-cd mailfeed-ui && npm run build && cd ..
 
 # Deploy update
 sudo /opt/mailfeed/deployment/scripts/update.sh

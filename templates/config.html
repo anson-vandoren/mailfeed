@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration - Mailfeed{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    <!-- App Bar (Navigation) -->
+    <header class="app-bar">
+        <div class="app-bar-lead">
+            <a href="/dashboard" class="h2 flex items-center gap-2" style="text-decoration: none; color: inherit;">
+                📰 <span class="hidden sm:inline">MailFeed</span>
+            </a>
+        </div>
+        <div class="app-bar-trail">
+            <!-- Light Switch -->
+            <button onclick="toggleTheme()" class="lightswitch" title="Toggle theme">
+                <div class="lightswitch-thumb"></div>
+            </button>
+            
+            <!-- Desktop navigation -->
+            <div class="hidden sm:flex items-center gap-2">
+                <a href="/dashboard" class="btn-sm variant-outline-primary">Dashboard</a>
+                <a href="/settings" class="btn-sm variant-outline-secondary">Settings</a>
+                <button hx-post="/auth/logout" 
+                        hx-target="#main"
+                        class="btn-sm variant-ghost-primary">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main content -->
+    <main style="flex: 1; padding: 1.5rem;">
+        <div style="max-width: 800px; margin: 0 auto;">
+            <div class="card">
+                <!-- Header -->
+                <div class="card-header">
+                    <h1 class="h2 flex items-center gap-3">
+                        🔧 <span>System Configuration</span>
+                    </h1>
+                    <p class="text-surface-500-400-token">Configure system-wide settings and preferences</p>
+                </div>
+
+                <!-- Messages Area -->
+                <div id="config-messages" class="px-6"></div>
+
+                <!-- Content -->
+                <div class="p-6 space-y-8">
+                    <!-- System Status -->
+                    <div class="space-y-4">
+                        <h2 class="h3 flex items-center gap-2">
+                            📊 <span>System Status</span>
+                        </h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="card variant-ghost">
+                                <div class="p-4">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <h3 class="font-semibold">Database</h3>
+                                            <p class="text-sm text-surface-500-400-token">SQLite connection</p>
+                                        </div>
+                                        <div class="badge variant-filled-success">✅ Online</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card variant-ghost">
+                                <div class="p-4">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <h3 class="font-semibold">Background Tasks</h3>
+                                            <p class="text-sm text-surface-500-400-token">Feed monitoring & email sending</p>
+                                        </div>
+                                        <div class="badge variant-filled-success">✅ Running</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Tokens (Admin Only) -->
+                    {% if user_role == "admin" %}
+                    <div class="space-y-4">
+                        <h2 class="h3 flex items-center gap-2">
+                            🔐 <span>System Tokens</span>
+                        </h2>
+                        
+                        <div class="alert variant-filled-warning">
+                            <div class="alert-message">
+                                <h3 class="h4">⚠️ Admin Only</h3>
+                                <p>These settings affect the entire system and require admin privileges.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="card variant-ghost">
+                            <div class="p-4">
+                                <div class="space-y-4">
+                                    <div>
+                                        <h3 class="font-semibold mb-2">Telegram Bot Token</h3>
+                                        <p class="text-sm text-surface-500-400-token mb-3">
+                                            Bot token for Telegram integration. Get this from 
+                                            <a href="https://t.me/BotFather" target="_blank" class="anchor">@BotFather</a>.
+                                        </p>
+                                        
+                                        <form hx-patch="/api/users/{{ user_id }}/config/telegram_bot_token"
+                                              hx-target="#config-messages"
+                                              hx-swap="innerHTML"
+                                              class="space-y-3">
+                                            <div class="input-group input-group-divider grid-cols-[1fr_auto]">
+                                                <input type="password"
+                                                       name="value"
+                                                       placeholder="Bot token from @BotFather"
+                                                       value="{{ telegram_bot_token }}"
+                                                       class="input"
+                                                       {% if telegram_bot_token != "" %}placeholder="••••••••••••••••"{% endif %}>
+                                                <button type="submit" class="btn variant-filled-primary">
+                                                    💾 Save
+                                                </button>
+                                            </div>
+                                            
+                                            <div class="flex items-center gap-2 text-sm">
+                                                {% if telegram_bot_token != "" %}
+                                                    <span class="badge variant-filled-success">✅ Configured</span>
+                                                    <span class="text-surface-500-400-token">Token is set and ready to use</span>
+                                                {% else %}
+                                                    <span class="badge variant-filled-error">❌ Not configured</span>
+                                                    <span class="text-surface-500-400-token">Telegram integration will not work without this</span>
+                                                {% endif %}
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Future Configuration Notice -->
+                    <div class="space-y-4">
+                        <h2 class="h3 flex items-center gap-2">
+                            🚀 <span>Advanced Settings</span>
+                        </h2>
+                        
+                        <div class="alert variant-ghost-primary">
+                            <div class="alert-message">
+                                <h3 class="h4">🔄 Coming Soon</h3>
+                                <p>Advanced configuration options for message formatting, feed monitoring intervals, and delivery preferences will be available in future updates.</p>
+                                <div class="mt-3">
+                                    <ul class="list-disc list-inside text-sm space-y-1 text-surface-600-300-token">
+                                        <li>Custom message formatting and length limits</li>
+                                        <li>Feed check intervals and timeout settings</li>
+                                        <li>Quiet hours and delivery preferences</li>
+                                        <li>User agent and HTTP request settings</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

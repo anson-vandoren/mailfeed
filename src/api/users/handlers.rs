@@ -146,7 +146,7 @@ pub async fn test_telegram(pool: RqDbPool, user_path: RqUserId, claims: SessionC
 
     if let Some(chat_id) = &user.telegram_chat_id {
         // Try to send a test message
-        match crate::telegram::client::TelegramClient::new() {
+        match crate::telegram::client::TelegramClient::new(&mut conn) {
             Ok(client) => {
                 let test_message = format!(
                     "<b>🧪 Mailfeed Test Message</b>\n\nHello! This is a test message from your Mailfeed bot.\n\n📊 <b>Your Settings:</b>\n• Chat ID: <code>{}</code>\n• Username: {}\n\nIf you received this, your Telegram integration is working! 🎉",

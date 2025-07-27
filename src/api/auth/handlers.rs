@@ -11,19 +11,17 @@ use crate::RqDbPool;
 pub async fn login(pool: RqDbPool, login_req: web::Json<LoginRequest>) -> AppResult<HttpResponse> {
     // Input validation
     if let Err(e) = validation::validate_email(&login_req.email) {
-        tracing::warn!(
-            email = %login_req.email,
-            error = %e,
-            "Login attempt with invalid email format"
+        log::warn!(
+            "Login attempt with invalid email format: {} (error: {})",
+            login_req.email, e
         );
         return Err(AppError::InvalidCredentials);
     }
     
     if login_req.password.is_empty() || login_req.password.len() > 128 {
-        tracing::warn!(
-            email = %login_req.email,
-            password_length = login_req.password.len(),
-            "Login attempt with invalid password length"
+        log::warn!(
+            "Login attempt with invalid password length: {} (length: {})",
+            login_req.email, login_req.password.len()
         );
         return Err(AppError::InvalidCredentials);
     }
@@ -33,9 +31,9 @@ pub async fn login(pool: RqDbPool, login_req: web::Json<LoginRequest>) -> AppRes
     let user = match User::get(&mut conn, UserQuery::Email(&login_req.email)) {
         Some(user) => user,
         None => {
-            tracing::warn!(
-                email = %login_req.email,
-                "Login attempt for non-existent user"
+            log::warn!(
+                "Login attempt for non-existent user: {}",
+                login_req.email
             );
             return Err(AppError::InvalidCredentials);
         }
@@ -57,11 +55,9 @@ pub async fn login(pool: RqDbPool, login_req: web::Json<LoginRequest>) -> AppRes
     // Create session and return response with session cookie
     match session_manager::create_session(&mut conn, &user) {
         Ok(response) => {
-            tracing::info!(
-                user_id = user.id,
-                email = %user.login_email,
-                role = %user.role,
-                "User login successful"
+            log::info!(
+                "User login successful: {} (id: {}, role: {})",
+                user.login_email, user.id, user.role
             );
             Ok(response)
         },
@@ -77,7 +73,7 @@ pub async fn logout(pool: RqDbPool, req: HttpRequest) -> AppResult<HttpResponse>
     let session_id = match req.cookie("session_id") {
         Some(cookie) => cookie.value().to_string(),
         None => {
-            tracing::warn!("Logout called without session cookie");
+            log::warn!("Logout called without session cookie");
             return Err(AppError::SessionExpired);
         }
     };
