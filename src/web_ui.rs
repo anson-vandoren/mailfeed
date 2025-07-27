@@ -266,8 +266,18 @@ pub async fn logout(
 #[get("/dashboard")]
 pub async fn dashboard(
     pool: RqDbPool,
-    claims: SessionClaims,
-) -> AppResult<HttpResponse> {
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse> {
+    // Check authentication and redirect to login if not authenticated
+    let claims = match extract_session_claims(&pool, &req).await {
+        Some(claims) => claims,
+        None => {
+            // Redirect to login page
+            return Ok(HttpResponse::SeeOther()
+                .append_header(("Location", "/"))
+                .finish());
+        }
+    };
     let mut conn = pool.get().map_err(|_| AppError::ConnectionPoolError)?;
     
     // Get user details
@@ -554,8 +564,18 @@ struct SettingsTemplate {
 #[get("/settings")]
 pub async fn settings_page(
     pool: RqDbPool,
-    claims: SessionClaims,
-) -> AppResult<HttpResponse> {
+    req: actix_web::HttpRequest,
+) -> Result<HttpResponse> {
+    // Check authentication and redirect to login if not authenticated
+    let claims = match extract_session_claims(&pool, &req).await {
+        Some(claims) => claims,
+        None => {
+            // Redirect to login page
+            return Ok(HttpResponse::SeeOther()
+                .append_header(("Location", "/"))
+                .finish());
+        }
+    };
     let mut conn = pool.get().map_err(|_| AppError::ConnectionPoolError)?;
     
     // Get user details
@@ -569,6 +589,30 @@ pub async fn settings_page(
         .body(template.render().unwrap()))
 }
 
+/// Helper function to extract session claims for web UI routes
+async fn extract_session_claims(pool: &RqDbPool, req: &actix_web::HttpRequest) -> Option<SessionClaims> {
+    use crate::session::extract_session_cookie;
+    use crate::models::session::Session;
+    use crate::models::user::{User, UserQuery};
+    
+    // Extract session cookie
+    let session_id = extract_session_cookie(req)?;
+    
+    // Get database connection
+    let mut conn = pool.get().ok()?;
+    
+    // Get valid session
+    let session = Session::get_valid(&mut conn, &session_id)?;
+    
+    // Get user details
+    let user = User::get(&mut conn, UserQuery::Id(session.user_id))?;
+    
+    Some(SessionClaims {
+        sub: user.id,
+        role: user.role,
+        email: user.login_email,
+    })
+}
 
 pub fn routes() -> actix_web::Scope {
     web::scope("")

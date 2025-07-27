@@ -128,7 +128,7 @@ impl FromRequest for SessionClaims {
 }
 
 /// Extract session ID from cookies
-fn extract_session_cookie(req: &HttpRequest) -> Option<String> {
+pub fn extract_session_cookie(req: &HttpRequest) -> Option<String> {
     req.cookie("session_id")
         .map(|cookie| cookie.value().to_string())
 }
