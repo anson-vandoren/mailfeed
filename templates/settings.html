@@ -207,6 +207,143 @@
             {% endif %}
         </section>
 
+        <!-- Email Delivery Section -->
+        <section>
+            <h2>📧 Email Delivery</h2>
+            
+            {% if let Some(email_config) = email_config %}
+            <!-- Email Configured State -->
+            <div>
+                <div style="padding: 1rem; background: #d1fae5; border: 1px solid #10b981; border-radius: var(--pico-border-radius); margin-bottom: 1rem;">
+                    <h4 style="margin: 0 0 0.5rem 0; color: #065f46;">✅ Email Configured</h4>
+                    <p style="margin: 0; font-size: 0.875rem; color: #047857;">
+                        <strong>SMTP Host:</strong> {{ email_config.smtp_host }}:{{ email_config.smtp_port }}<br>
+                        <strong>From Email:</strong> {{ email_config.from_email }}
+                        {% if let Some(from_name) = email_config.from_name %}
+                        <br><strong>From Name:</strong> {{ from_name }}
+                        {% endif %}
+                    </p>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                    <button hx-post="/api/users/{{ user.id }}/test-email"
+                            hx-target="#settings-messages"
+                            hx-swap="innerHTML"
+                            class="secondary">
+                        🧪 Send Test Email
+                    </button>
+                    
+                    <button onclick="document.getElementById('email-edit-form').style.display = 'block'; this.style.display = 'none';"
+                            class="secondary">
+                        ✏️ Edit Settings
+                    </button>
+                    
+                    <form hx-delete="/api/users/{{ user.id }}/email-config" 
+                          hx-target="#settings-messages"
+                          hx-swap="innerHTML"
+                          style="display: inline;">
+                        <button type="submit" class="contrast">
+                            🔌 Remove Email Config
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <!-- Email Not Configured State -->
+            <div>
+                <div style="padding: 1rem; background: #fef3c7; border: 1px solid #f59e0b; border-radius: var(--pico-border-radius); margin-bottom: 1rem;">
+                    <h4 style="margin: 0 0 0.5rem 0; color: #92400e;">⚠️ Email Not Configured</h4>
+                    <p style="margin: 0; color: #92400e;">Configure your SMTP settings to receive feed updates via email.</p>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Email Configuration Form -->
+            <form id="email-edit-form" 
+                  hx-post="/api/users/{{ user.id }}/email-config" 
+                  hx-target="#settings-messages"
+                  hx-swap="innerHTML"
+                  {% if let Some(_) = email_config %}style="display: none;"{% endif %}>
+                
+                <h4>📧 SMTP Configuration</h4>
+                
+                <div class="grid">
+                    <label>
+                        SMTP Host *
+                        <input type="text" name="smtp_host" 
+                               value="{% if let Some(config) = email_config %}{{ config.smtp_host }}{% endif %}"
+                               placeholder="smtp.gmail.com" required>
+                        <small>Your email provider's SMTP server</small>
+                    </label>
+                    
+                    <label>
+                        Port
+                        <input type="number" name="smtp_port" 
+                               value="{% if let Some(config) = email_config %}{{ config.smtp_port }}{% else %}587{% endif %}"
+                               min="1" max="65535">
+                        <small>Usually 587 (TLS) or 465 (SSL)</small>
+                    </label>
+                </div>
+                
+                <div class="grid">
+                    <label>
+                        Username *
+                        <input type="text" name="smtp_username" 
+                               value="{% if let Some(config) = email_config %}{{ config.smtp_username }}{% endif %}"
+                               placeholder="your-email@gmail.com" required>
+                    </label>
+                    
+                    <label>
+                        Password *
+                        {% if let Some(_) = email_config %}
+                        <input type="password" name="smtp_password" 
+                               placeholder="••••••••">
+                        {% else %}
+                        <input type="password" name="smtp_password" 
+                               placeholder="App password or email password" required>
+                        {% endif %}
+                        <small>Use app-specific passwords for Gmail/Outlook</small>
+                    </label>
+                </div>
+                
+                <div class="grid">
+                    <label>
+                        From Email *
+                        <input type="email" name="from_email" 
+                               value="{% if let Some(config) = email_config %}{{ config.from_email }}{% endif %}"
+                               placeholder="feeds@yourdomain.com" required>
+                    </label>
+                    
+                    <label>
+                        From Name
+                        <input type="text" name="from_name" 
+                               value="{% if let Some(config) = email_config %}{% if let Some(from_name) = config.from_name %}{{ from_name }}{% endif %}{% endif %}"
+                               placeholder="MailFeed Updates">
+                    </label>
+                </div>
+                
+                <label>
+                    {% if let Some(config) = email_config %}
+                    <input type="checkbox" name="smtp_use_tls" {% if config.smtp_use_tls %}checked{% endif %}> 
+                    {% else %}
+                    <input type="checkbox" name="smtp_use_tls" checked> 
+                    {% endif %}
+                    Use TLS encryption (recommended)
+                </label>
+                
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                    <button type="submit">💾 {% if let Some(_) = email_config %}Update{% else %}Save{% endif %} Email Config</button>
+                    {% if let Some(_) = email_config %}
+                    <button type="button" 
+                            onclick="document.getElementById('email-edit-form').style.display = 'none';"
+                            class="secondary">
+                        ✖️ Cancel
+                    </button>
+                    {% endif %}
+                </div>
+            </form>
+        </section>
+
         <!-- System Configuration (Admin Only) -->
         {% if user.role == "admin" %}
         <section>

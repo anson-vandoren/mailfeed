@@ -1,3 +1,4 @@
+pub mod email_config;
 pub mod feed;
 pub mod feed_item;
 pub mod session;

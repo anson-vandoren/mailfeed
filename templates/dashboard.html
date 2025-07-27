@@ -86,6 +86,21 @@
                     
                     <label class="form-field">
                         <span class="field-label">
+                            <span class="field-icon">📨</span>
+                            <span class="field-title">Delivery Method</span>
+                        </span>
+                        <select name="delivery_method" id="delivery_method" class="enhanced-input" aria-describedby="delivery-help">
+                            <option value="telegram_only">📱 Telegram Only</option>
+                            <option value="email_only">📧 Email Only</option>
+                            <option value="both">📱📧 Both Telegram & Email</option>
+                        </select>
+                        <small id="delivery-help" class="field-help">
+                            Choose how you want to receive updates for this feed
+                        </small>
+                    </label>
+                    
+                    <label class="form-field">
+                        <span class="field-label">
                             <span class="field-icon">🏷️</span>
                             <span class="field-title">Custom Name</span>
                             <small class="field-hint">(optional)</small>

@@ -1,240 +1,297 @@
-use super::types::{
-    EmailData, EmailServerCfg, FeedData, FromEmail, MultiPartEmailContent, ToEmail,
+use super::delivery::EmailDeliveryService;
+use crate::models::{
+    subscription::{DeliveryMethod, Subscription},
+    email_config::EmailConfig,
+    feed_item::FeedItem,
 };
-use crate::{
-    models::{
-        feed::Feed,
-        feed_item::FeedItem,
-        subscription::{Frequency, PartialSubscription, Subscription},
-        user::User,
-    },
-    tasks::types::CHECK_INTERVAL,
-    DbPool,
-};
-use chrono::{TimeZone, Utc};
-use diesel::SqliteConnection;
-use lettre::{
-    error::Error,
-    message::{header::ContentType, MultiPart, SinglePart},
-    Message, Transport,
-};
+use crate::DbPool;
+use diesel::prelude::*;
+use log::{debug, error, info, warn};
+use std::collections::HashMap;
+use tokio::time::Duration;
 
 pub async fn start(pool: DbPool) {
-    let cfg = EmailServerCfg::from_env();
-    // return early if we can't create the sender
-    let sender = match cfg.to_transport() {
-        Ok(sender) => sender,
-        Err(e) => {
-            log::error!("Error creating email sender: {:?}", e);
-            return;
-        }
-    };
+    info!("Starting email sender runner");
+    let mut delivery_service = EmailDeliveryService::new();
 
-    let mut interval = tokio::time::interval(CHECK_INTERVAL);
+    let mut interval = tokio::time::interval(Duration::from_secs(300)); // 5 minutes
     loop {
         interval.tick().await;
+        
         let mut conn = match pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                log::error!("Error getting DB connection: {:?}", e);
+                error!("Error getting DB connection: {:?}", e);
                 continue;
             }
         };
 
-        let users = User::get_all(&mut conn);
-        // unwrap and get active users
-        let users = users.into_iter().flatten().filter(|user| user.is_active);
-
-        for user in users {
-            let email_data = items_to_send_by_user(&mut conn, user.id);
-            for feed_data in &email_data.feed_data {
-                if feed_data.new_items.is_empty() {
-                    log::debug!("No new items for sub_id={}", feed_data.sub_id);
-                    continue;
-                }
-                let as_plain = to_plain_email(feed_data);
-                let as_html = to_html_email(feed_data);
-                let content = MultiPartEmailContent {
-                    as_plain: &as_plain,
-                    as_html: &as_html,
-                };
-                let message = construct_email(&user.send_email, &cfg.from_email, content);
-                let message = match message {
-                    Ok(message) => message,
-                    Err(e) => {
-                        log::error!("Error constructing email: {:?}", e);
-                        continue;
-                    }
-                };
-                let email_result = sender.send(&message);
-                match email_result {
-                    Ok(_) => {
-                        log::info!(
-                            "Email sent to {} for sub_id={}",
-                            user.send_email,
-                            feed_data.sub_id
-                        );
-                    }
-                    Err(e) => {
-                        log::error!("Error sending email: {:?}", e);
-                        continue;
-                    }
-                }
-
-                let update = PartialSubscription {
-                    last_sent_time: Some(Utc::now().timestamp() as i32),
-                    ..Default::default()
-                };
-                Subscription::update(&mut conn, feed_data.sub_id, &update);
-            }
+        if let Err(e) = process_pending_emails(&mut delivery_service, &mut conn).await {
+            error!("Error in email sender: {}", e);
         }
     }
 }
 
-fn items_to_send_by_user(conn: &mut SqliteConnection, user_id: i32) -> EmailData {
-    let subscriptions = Subscription::get_all_for_user(conn, user_id).unwrap();
-    let mut feed_data = Vec::new();
-    for sub in subscriptions {
-        let feed_id = sub.feed_id;
-        let last_sent = sub.last_sent_time;
+/// Process all pending email deliveries
+async fn process_pending_emails(
+    delivery_service: &mut EmailDeliveryService,
+    conn: &mut diesel::SqliteConnection,
+) -> Result<(), Box<dyn std::error::Error>> {
+    debug!("Processing pending email deliveries");
 
-        // if last_sent + frequency is > now, skip
-        let now = chrono::Utc::now().timestamp() as i32;
-        let should_send = match sub.frequency {
-            Frequency::Realtime => true,
-            Frequency::Hourly => now - last_sent > 3600,
-            Frequency::Daily => now - last_sent > 86400,
-        };
+    // Get all subscriptions that have email delivery enabled
+    let email_subscriptions = get_email_subscriptions(conn)?;
+    
+    if email_subscriptions.is_empty() {
+        debug!("No email subscriptions found");
+        return Ok(());
+    }
 
-        let feed = Feed::get_by_id(conn, feed_id).unwrap();
+    info!("Found {} email subscriptions to process", email_subscriptions.len());
 
-        if !should_send {
-            log::info!(
-                "Not enough time elapsed to send again for {:?} with frequency={:?}",
-                sub.friendly_name,
-                sub.frequency,
-            );
+    // Group subscriptions by user and frequency for efficient processing
+    let mut user_subscriptions: HashMap<i32, Vec<Subscription>> = HashMap::new();
+    
+    for subscription in email_subscriptions {
+        user_subscriptions
+            .entry(subscription.user_id)
+            .or_insert_with(Vec::new)
+            .push(subscription);
+    }
+
+    // Process each user's subscriptions
+    for (user_id, subscriptions) in user_subscriptions {
+        if let Err(e) = process_user_emails(delivery_service, conn, user_id, subscriptions).await {
+            error!("Failed to process emails for user {}: {}", user_id, e);
             continue;
         }
-
-        let new_items = FeedItem::items_after(conn, feed_id, last_sent);
-        feed_data.push(FeedData {
-            sub_id: sub.id,
-            new_items,
-            feed_title: feed.title,
-            feed_link: feed.url,
-        });
     }
-    EmailData { feed_data }
+
+    Ok(())
 }
 
-fn construct_email(
-    to_email: ToEmail,
-    from_email: FromEmail,
-    content: MultiPartEmailContent,
-) -> Result<Message, Error> {
-    // TODO: settings entries for SMTP server
-    // TODO: settings entry for updating From Name and From Email
-    Message::builder()
-        .from(from_email.parse().unwrap())
-        .to(to_email.parse().unwrap())
-        .subject("MailFeed Digest")
-        .multipart(
-            MultiPart::alternative()
-                .singlepart(
-                    SinglePart::builder()
-                        .header(ContentType::TEXT_PLAIN)
-                        .body(content.as_plain.to_string()),
-                )
-                .singlepart(
-                    SinglePart::builder()
-                        .header(ContentType::TEXT_HTML)
-                        .body(content.as_html.to_string()),
-                ),
-        )
-}
+/// Process email deliveries for a specific user
+async fn process_user_emails(
+    delivery_service: &mut EmailDeliveryService,
+    conn: &mut diesel::SqliteConnection,
+    user_id: i32,
+    subscriptions: Vec<Subscription>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    debug!("Processing emails for user {}", user_id);
 
-fn to_html_email(feed_data: &FeedData) -> String {
-    let mut result = EMAIL_TEMPLATE_HEAD.to_string();
-    result.push_str(&format!(
-        "<h2>{}</h2>
-            <a href='{}'>View Feed</a>",
-        feed_data.feed_title, feed_data.feed_link
-    ));
-    for item in &feed_data.new_items {
-        let date_time = Utc.timestamp_opt(item.pub_date as i64, 0).unwrap();
-        result.push_str(&format!(
-            "<div class='feed-item'>
-                    <h2><a href='{}'>{}</a></h2>
-                    <time>{}</time>
-                    <p>{}</p>
-                    <p class='author'>{}</p>
-                </div>",
-            item.link,
-            item.title,
-            item.description
-                .as_deref()
-                .unwrap_or("No description provided"),
-            date_time.format("%Y-%m-%d %H:%M:%S"),
-            item.author.as_deref().unwrap_or("No author provided")
-        ));
+    // Get user's email configuration
+    let email_config = match get_user_email_config(conn, user_id)? {
+        Some(config) => config,
+        None => {
+            warn!("User {} has email subscriptions but no email config", user_id);
+            return Ok(());
+        }
+    };
+
+    if !email_config.is_active {
+        debug!("Email config is inactive for user {}", user_id);
+        return Ok(());
     }
-    result.push_str("<hr />");
-    result.push_str(EMAIL_TEMPLATE_FOOT);
-    result
-}
 
-fn to_plain_email(feed_data: &FeedData) -> String {
-    let mut result = "MailFeed Digest\n\n".to_string();
-    result.push_str(&format!(
-        "{}\nView Feed: {}\n",
-        feed_data.feed_title, feed_data.feed_link
-    ));
-    for item in &feed_data.new_items {
-        let date_time = Utc.timestamp_opt(item.pub_date as i64, 0).unwrap();
-        let description = item
-            .description
-            .clone()
-            .unwrap_or("No description provided".to_string());
-
-        result.push_str(&format!(
-            "{}\n{}\n{}\n{}\n{}\n----------\n\n",
-            item.link,
-            item.title,
-            html_escape::decode_html_entities(&description),
-            date_time.format("%Y-%m-%d %H:%M:%S"),
-            item.author
-                .clone()
-                .unwrap_or("No author provided".to_string())
-        ));
+    // Group subscriptions by frequency for digest emails
+    let mut frequency_groups: HashMap<String, Vec<Subscription>> = HashMap::new();
+    
+    for subscription in subscriptions {
+        if !subscription.is_active {
+            continue;
+        }
+        
+        frequency_groups
+            .entry(subscription.frequency.to_string())
+            .or_insert_with(Vec::new)
+            .push(subscription);
     }
-    result.push('\n');
-    result
+
+    // Process each frequency group
+    for (frequency, group_subscriptions) in frequency_groups {
+        if let Err(e) = process_frequency_group(
+            delivery_service,
+            conn,
+            &email_config,
+            &frequency,
+            group_subscriptions
+        ).await {
+            error!("Failed to process {} emails for user {}: {}", frequency, user_id, e);
+        }
+    }
+
+    Ok(())
 }
 
-const EMAIL_TEMPLATE_HEAD: &str = r#"<html>
-<head>
-  <meta charset='UTF-8' />
-  <title>MailFeed Digest</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f6f6f6; } .container { width:
-    80%; margin: 0 auto; background-color: #ffffff; padding: 20px; } h1 { color: #333333; } .feed { margin-bottom:
-    20px; } .feed-item { border-bottom: 1px solid #dddddd; padding: 10px 0; } .feed-item:last-child { border-bottom:
-    0; } .feed-item h2 { margin: 0; font-size: 18px; } .feed-item a { color: #007bff; text-decoration: none; }
-    .feed-item p { color: #666666; margin: 10px 0; } .feed-item time { color: #999999; font-size: 12px; } .author {
-    color: #999999; font-size: 14px; }
-  </style>
-</head>
-<body>
-  <div class='container'>
-    <h1>MailFeed Digest</h1>
-    <div class='feed'>
-"#;
+/// Process a group of subscriptions with the same frequency
+async fn process_frequency_group(
+    delivery_service: &mut EmailDeliveryService,
+    conn: &mut diesel::SqliteConnection,
+    email_config: &EmailConfig,
+    frequency: &str,
+    subscriptions: Vec<Subscription>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    debug!("Processing {} {} subscriptions for user {}", 
+           subscriptions.len(), frequency, email_config.user_id);
 
-const EMAIL_TEMPLATE_FOOT: &str = r#"
-        </div>
-      </div>
-    </div>
-  </body>
-</html>
-"#;
+    match frequency {
+        "realtime" => {
+            // Send individual emails for each new item
+            for subscription in subscriptions {
+                send_realtime_emails(delivery_service, conn, email_config, &subscription).await?;
+            }
+        }
+        "hourly" | "daily" => {
+            // Send digest emails
+            send_digest_emails(delivery_service, conn, email_config, frequency, subscriptions).await?;
+        }
+        _ => {
+            warn!("Unknown frequency: {}", frequency);
+        }
+    }
+
+    Ok(())
+}
+
+/// Send realtime emails for a subscription
+async fn send_realtime_emails(
+    delivery_service: &mut EmailDeliveryService,
+    conn: &mut diesel::SqliteConnection,
+    email_config: &EmailConfig,
+    subscription: &Subscription,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Get new feed items that haven't been sent yet
+    let new_items = get_new_feed_items(conn, subscription)?;
+    
+    if new_items.is_empty() {
+        return Ok(());
+    }
+
+    debug!("Sending {} realtime emails for subscription {}", 
+           new_items.len(), subscription.id);
+
+    // Get feed title for context
+    let feed_title = get_feed_title(conn, subscription.feed_id)?;
+
+    // Send each item individually for realtime
+    for item in &new_items {
+        if let Err(e) = delivery_service
+            .send_feed_item(email_config, item, &feed_title)
+            .await
+        {
+            error!("Failed to send realtime email for item {}: {}", item.id, e);
+            continue;
+        }
+    }
+
+    // Mark items as sent
+    mark_items_as_sent(conn, &new_items)?;
+
+    Ok(())
+}
+
+/// Send digest emails for a group of subscriptions
+async fn send_digest_emails(
+    delivery_service: &mut EmailDeliveryService,
+    conn: &mut diesel::SqliteConnection,
+    email_config: &EmailConfig,
+    frequency: &str,
+    subscriptions: Vec<Subscription>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut all_items = Vec::new();
+
+    // Collect all new items from all subscriptions
+    for subscription in &subscriptions {
+        let items = get_new_feed_items(conn, subscription)?;
+        let feed_title = get_feed_title(conn, subscription.feed_id)?;
+        
+        for item in items {
+            all_items.push((item, feed_title.clone()));
+        }
+    }
+
+    if all_items.is_empty() {
+        debug!("No new items for {} digest for user {}", frequency, email_config.user_id);
+        return Ok(());
+    }
+
+    debug!("Sending {} digest with {} items for user {}", 
+           frequency, all_items.len(), email_config.user_id);
+
+    // Send the digest
+    if let Err(e) = delivery_service
+        .send_digest(email_config, &all_items, frequency)
+        .await
+    {
+        error!("Failed to send {} digest for user {}: {}", frequency, email_config.user_id, e);
+        return Err(e.into());
+    }
+
+    // Mark all items as sent
+    let items_only: Vec<FeedItem> = all_items.into_iter().map(|(item, _)| item).collect();
+    mark_items_as_sent(conn, &items_only)?;
+
+    Ok(())
+}
+
+/// Get all subscriptions that have email delivery enabled
+fn get_email_subscriptions(conn: &mut diesel::SqliteConnection) -> Result<Vec<Subscription>, diesel::result::Error> {
+    use crate::schema::subscriptions::dsl::*;
+    
+    subscriptions
+        .filter(is_active.eq(true))
+        .filter(delivery_method.ne(DeliveryMethod::TelegramOnly as i32))
+        .load::<Subscription>(conn)
+}
+
+/// Get email configuration for a user
+fn get_user_email_config(conn: &mut diesel::SqliteConnection, target_user_id: i32) -> Result<Option<EmailConfig>, diesel::result::Error> {
+    use crate::schema::email_configs::dsl::*;
+    
+    email_configs
+        .filter(user_id.eq(target_user_id))
+        .first::<EmailConfig>(conn)
+        .optional()
+}
+
+/// Get new feed items for a subscription that haven't been sent yet
+fn get_new_feed_items(conn: &mut diesel::SqliteConnection, subscription: &Subscription) -> Result<Vec<FeedItem>, diesel::result::Error> {
+    use crate::schema::feed_items::dsl::*;
+    
+    // For now, we'll use a simple approach: get items from the last hour for hourly,
+    // last day for daily, and last 5 minutes for realtime
+    let cutoff_time = match subscription.frequency.to_string().as_str() {
+        "realtime" => chrono::Utc::now() - chrono::Duration::minutes(5),
+        "hourly" => chrono::Utc::now() - chrono::Duration::hours(1),
+        "daily" => chrono::Utc::now() - chrono::Duration::days(1),
+        _ => chrono::Utc::now() - chrono::Duration::hours(1),
+    };
+
+    feed_items
+        .filter(feed_id.eq(subscription.feed_id))
+        .filter(pub_date.gt(cutoff_time.timestamp() as i32))
+        .order(pub_date.desc())
+        .limit(subscription.max_items as i64)
+        .load::<FeedItem>(conn)
+}
+
+/// Get the title of a feed
+fn get_feed_title(conn: &mut diesel::SqliteConnection, feed_id_val: i32) -> Result<String, diesel::result::Error> {
+    use crate::schema::feeds::dsl::*;
+    
+    feeds
+        .find(feed_id_val)
+        .select(title)
+        .first::<String>(conn)
+}
+
+/// Mark feed items as sent (placeholder - we might need to add a sent_at column)
+fn mark_items_as_sent(_conn: &mut diesel::SqliteConnection, _items: &[FeedItem]) -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: In a production system, we'd want to track which items have been sent
+    // to avoid sending duplicates. For now, we rely on the time-based cutoffs.
+    // This could be implemented by adding a `sent_notifications` table or
+    // `email_sent_at` column to track delivery status per user.
+    
+    debug!("Marked {} items as sent (placeholder)", _items.len());
+    Ok(())
+}

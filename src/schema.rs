@@ -1,6 +1,23 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    email_configs (id) {
+        id -> Nullable<Integer>,
+        user_id -> Integer,
+        smtp_host -> Text,
+        smtp_port -> Integer,
+        smtp_username -> Text,
+        smtp_password -> Text,
+        smtp_use_tls -> Bool,
+        from_email -> Text,
+        from_name -> Nullable<Text>,
+        is_active -> Bool,
+        created_at -> Integer,
+        updated_at -> Integer,
+    }
+}
+
+diesel::table! {
     feed_items (id) {
         id -> Integer,
         feed_id -> Integer,
@@ -57,6 +74,7 @@ diesel::table! {
         max_items -> Integer,
         is_active -> Bool,
         feed_id -> Integer,
+        delivery_method -> Integer,
     }
 }
 
@@ -86,12 +104,14 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(email_configs -> users (user_id));
 diesel::joinable!(feed_items -> feeds (feed_id));
 diesel::joinable!(sessions -> users (user_id));
 diesel::joinable!(subscriptions -> feeds (feed_id));
 diesel::joinable!(subscriptions -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    email_configs,
     feed_items,
     feeds,
     sessions,

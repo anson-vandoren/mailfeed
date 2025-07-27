@@ -53,6 +53,7 @@ struct SubscriptionForm {
     frequency: String,
     max_items: i32,
     is_active: Option<String>, // Checkbox sends value or nothing
+    delivery_method: Option<String>, // "telegram_only", "email_only", "both"
 }
 
 #[derive(Deserialize)]
@@ -60,6 +61,7 @@ struct NewSubscriptionForm {
     url: String,
     friendly_name: Option<String>,
     frequency: String,
+    delivery_method: Option<String>, // "telegram_only", "email_only", "both"
 }
 
 /// Serve the login page or redirect to dashboard if already logged in
@@ -407,7 +409,7 @@ pub async fn subscription_update(
     }
 
     // Create the update object
-    use crate::models::subscription::{Frequency, PartialSubscription};
+    use crate::models::subscription::{Frequency, PartialSubscription, DeliveryMethod};
     
     let frequency = match form.frequency.as_str() {
         "realtime" => Frequency::Realtime,
@@ -416,12 +418,20 @@ pub async fn subscription_update(
         _ => return Err(AppError::invalid_input("frequency", "Invalid frequency")),
     };
 
+    let delivery_method = match form.delivery_method.as_deref() {
+        Some("telegram_only") => Some(DeliveryMethod::TelegramOnly),
+        Some("email_only") => Some(DeliveryMethod::EmailOnly),
+        Some("both") => Some(DeliveryMethod::Both),
+        _ => None, // Keep existing if not specified
+    };
+
     let update = PartialSubscription {
         friendly_name: form.friendly_name.clone(),
         frequency: Some(frequency),
         max_items: Some(form.max_items),
         is_active: Some(form.is_active.is_some()),
         last_sent_time: None, // Don't change this
+        delivery_method,
     };
 
     // Save the updated subscription
@@ -488,8 +498,8 @@ pub async fn subscription_create(
 
     let mut conn = pool.get().map_err(|_| AppError::ConnectionPoolError)?;
 
-    // Parse frequency
-    use crate::models::subscription::{Frequency, NewSubscription};
+    // Parse frequency and delivery method
+    use crate::models::subscription::{Frequency, NewSubscription, DeliveryMethod};
     use crate::models::feed::{Feed, NewFeed};
     
     let frequency = match form.frequency.as_str() {
@@ -497,6 +507,13 @@ pub async fn subscription_create(
         "hourly" => Frequency::Hourly,
         "daily" => Frequency::Daily,
         _ => return Err(AppError::invalid_input("frequency", "Invalid frequency")),
+    };
+
+    let delivery_method = match form.delivery_method.as_deref() {
+        Some("telegram_only") => DeliveryMethod::TelegramOnly,
+        Some("email_only") => DeliveryMethod::EmailOnly,
+        Some("both") => DeliveryMethod::Both,
+        _ => DeliveryMethod::TelegramOnly, // Default to Telegram for backward compatibility
     };
 
     // Check if feed exists, create if not
@@ -533,6 +550,7 @@ pub async fn subscription_create(
         max_items: 10, // Default to 10 items
         is_active: true,
         feed_id: feed.id,
+        delivery_method, // Use the parsed delivery method
     };
 
     let subscription = new_subscription.insert(&mut conn)
@@ -556,6 +574,7 @@ pub async fn subscription_create(
 #[template(path = "settings.html")]
 struct SettingsTemplate {
     user: User,
+    email_config: Option<crate::models::email_config::EmailConfig>,
 }
 
 
@@ -582,7 +601,10 @@ pub async fn settings_page(
     let user = User::get(&mut conn, UserQuery::Id(claims.sub))
         .ok_or(AppError::resource_not_found("User"))?;
     
-    let template = SettingsTemplate { user };
+    // Get email config if exists
+    let email_config = crate::models::email_config::EmailConfig::get_by_user_id(&mut conn, claims.sub);
+    
+    let template = SettingsTemplate { user, email_config };
     
     Ok(HttpResponse::Ok()
         .content_type("text/html")

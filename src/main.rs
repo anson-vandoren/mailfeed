@@ -184,6 +184,7 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
 
     tokio::spawn(tasks::feed_monitor::runner::start(db_pool.clone()));
     tokio::spawn(tasks::telegram_sender::runner::start(db_pool.clone()));
+    tokio::spawn(tasks::email_sender::runner::start(db_pool.clone()));
 
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -220,6 +221,7 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
                 web::scope("/api")
                     .wrap(Governor::new(&general_rate_limiter)) // General rate limiting for non-auth endpoints
                     .service(api::users::routes())
+                    .service(api::email::routes::routes())
                     .service(api::subscriptions::routes())
                     .service(api::feeds::routes())
                     .service(api::config::routes())

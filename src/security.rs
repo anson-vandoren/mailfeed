@@ -174,6 +174,9 @@ pub mod validation {
     }
 }
 
+/// Password encryption module for securing SMTP credentials
+pub mod encryption;
+
 /// Rate limiting configuration for different endpoints
 pub use actix_governor::{GovernorConfigBuilder, GovernorConfig};
 

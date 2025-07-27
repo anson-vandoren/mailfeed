@@ -36,6 +36,17 @@
         <span style="padding: 0.125rem 0.5rem; background: var(--pico-secondary-background); color: var(--pico-secondary); border-radius: 1rem;">
             {{ sub.subscription.max_items }} items
         </span>
+        <span style="padding: 0.125rem 0.5rem; background: var(--pico-contrast-background); color: var(--pico-contrast); border-radius: 1rem;">
+            {% if sub.subscription.delivery_method == "telegram_only" %}
+                📱 Telegram
+            {% else if sub.subscription.delivery_method == "email_only" %}
+                📧 Email
+            {% else if sub.subscription.delivery_method == "both" %}
+                📱📧 Both
+            {% else %}
+                📱 Telegram
+            {% endif %}
+        </span>
         <span style="display: flex; align-items: center; gap: 0.25rem;">
             {% if sub.subscription.is_active %}
                 <span style="width: 0.5rem; height: 0.5rem; background: #10b981; border-radius: 50%;"></span>

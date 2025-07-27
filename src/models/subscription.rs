@@ -26,6 +26,8 @@ pub struct Subscription {
     pub max_items: i32,
     pub is_active: bool,
     pub feed_id: i32,
+    /// delivery method: telegram_only, email_only, both
+    pub delivery_method: DeliveryMethod,
     // TODO: add send_existing option
 }
 
@@ -84,6 +86,64 @@ where
     }
 }
 
+#[repr(i32)]
+#[derive(Debug, Serialize, Deserialize, AsExpression, Clone, Copy, FromSqlRow, PartialEq)]
+#[diesel(sql_type=Integer)]
+#[serde(rename_all = "snake_case")]
+pub enum DeliveryMethod {
+    TelegramOnly = 0,
+    EmailOnly = 1,
+    Both = 2,
+}
+
+impl fmt::Display for DeliveryMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DeliveryMethod::TelegramOnly => write!(f, "telegram_only"),
+            DeliveryMethod::EmailOnly => write!(f, "email_only"),
+            DeliveryMethod::Both => write!(f, "both"),
+        }
+    }
+}
+
+impl PartialEq<&str> for DeliveryMethod {
+    fn eq(&self, other: &&str) -> bool {
+        matches!((self, *other), 
+            (DeliveryMethod::TelegramOnly, "telegram_only") | 
+            (DeliveryMethod::EmailOnly, "email_only") | 
+            (DeliveryMethod::Both, "both"))
+    }
+}
+
+impl<DB> FromSql<Integer, DB> for DeliveryMethod
+where
+    DB: Backend,
+    i32: FromSql<Integer, DB>,
+{
+    fn from_sql(bytes: DB::RawValue<'_>) -> deserialize::Result<Self> {
+        match i32::from_sql(bytes)? {
+            0 => Ok(DeliveryMethod::TelegramOnly),
+            1 => Ok(DeliveryMethod::EmailOnly),
+            2 => Ok(DeliveryMethod::Both),
+            _ => Err("Unrecognized delivery method variant".into()),
+        }
+    }
+}
+
+impl<DB> ToSql<Integer, DB> for DeliveryMethod
+where
+    DB: Backend,
+    i32: ToSql<Integer, DB>,
+{
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, DB>) -> serialize::Result {
+        match self {
+            DeliveryMethod::TelegramOnly => 0.to_sql(out),
+            DeliveryMethod::EmailOnly => 1.to_sql(out),
+            DeliveryMethod::Both => 2.to_sql(out),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Insertable)]
 #[diesel(table_name = subscriptions)]
 pub struct NewSubscription {
@@ -97,6 +157,8 @@ pub struct NewSubscription {
     pub max_items: i32,
     pub is_active: bool,
     pub feed_id: i32,
+    /// delivery method: telegram_only, email_only, both
+    pub delivery_method: DeliveryMethod,
 }
 
 impl Default for NewSubscription {
@@ -109,6 +171,7 @@ impl Default for NewSubscription {
             max_items: 0,
             is_active: true,
             feed_id: 0,
+            delivery_method: DeliveryMethod::TelegramOnly,
         }
     }
 }
@@ -124,6 +187,8 @@ pub struct PartialSubscription {
     /// zero if no limit
     pub max_items: Option<i32>,
     pub is_active: Option<bool>,
+    /// delivery method: telegram_only, email_only, both
+    pub delivery_method: Option<DeliveryMethod>,
 }
 
 impl NewSubscription {

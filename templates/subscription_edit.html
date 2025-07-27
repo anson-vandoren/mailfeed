@@ -33,6 +33,15 @@
                        min="1"
                        max="100">
             </label>
+            
+            <label>
+                Delivery Method
+                <select name="delivery_method" id="delivery_method_{{ sub.subscription.id }}">
+                    <option value="telegram_only" {% if sub.subscription.delivery_method == "telegram_only" %}selected{% endif %}>📱 Telegram Only</option>
+                    <option value="email_only" {% if sub.subscription.delivery_method == "email_only" %}selected{% endif %}>📧 Email Only</option>
+                    <option value="both" {% if sub.subscription.delivery_method == "both" %}selected{% endif %}>📱📧 Both</option>
+                </select>
+            </label>
         </div>
         
         <label>
