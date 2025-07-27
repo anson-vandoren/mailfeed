@@ -3,20 +3,18 @@ use std::future::{ready, Ready};
 use crate::{models::session::Session, models::user::User, types::ErrorMessage};
 use crate::RqDbPool;
 use actix_web::{
-    dev::Payload, error::ResponseError, http::StatusCode, web, FromRequest, HttpRequest,
+    dev::Payload, error::ResponseError, http::StatusCode, FromRequest, HttpRequest,
     HttpResponse,
 };
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Display)]
-enum SessionError {
+pub enum SessionError {
     #[display(fmt = "no_session_cookie")]
     NoSessionCookie,
     #[display(fmt = "invalid_session")]
     InvalidSession,
-    #[display(fmt = "session_expired")]
-    SessionExpired,
     #[display(fmt = "database_error")]
     DatabaseError,
 }
@@ -24,7 +22,7 @@ enum SessionError {
 impl ResponseError for SessionError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            Self::NoSessionCookie | Self::InvalidSession | Self::SessionExpired => {
+            Self::NoSessionCookie | Self::InvalidSession => {
                 HttpResponse::Unauthorized().json(ErrorMessage {
                     error: Some("unauthorized".to_string()),
                     error_description: Some("Valid session required".to_string()),
@@ -41,7 +39,7 @@ impl ResponseError for SessionError {
 
     fn status_code(&self) -> StatusCode {
         match self {
-            Self::NoSessionCookie | Self::InvalidSession | Self::SessionExpired => {
+            Self::NoSessionCookie | Self::InvalidSession => {
                 StatusCode::UNAUTHORIZED
             }
             Self::DatabaseError => StatusCode::INTERNAL_SERVER_ERROR,
@@ -114,7 +112,7 @@ impl FromRequest for SessionClaims {
         }
 
         // Update last_accessed timestamp
-        if let Err(_) = session.touch(&mut conn) {
+        if session.touch(&mut conn).is_err() {
             log::warn!("Failed to update session last_accessed time");
         }
 
@@ -138,8 +136,6 @@ fn extract_session_cookie(req: &HttpRequest) -> Option<String> {
 /// Session management functions
 pub mod session_manager {
     use super::*;
-    use actix_web::{http::header, HttpResponse, ResponseError};
-    use chrono::Utc;
     use diesel::SqliteConnection;
 
     /// Create a new session and set the session cookie
@@ -205,8 +201,4 @@ pub mod session_manager {
         Ok(response)
     }
 
-    /// Cleanup expired sessions - should be called periodically
-    pub fn cleanup_expired_sessions(conn: &mut SqliteConnection) -> Result<usize, SessionError> {
-        Session::cleanup_expired(conn).map_err(|_| SessionError::DatabaseError)
-    }
 }

@@ -1,93 +1,57 @@
 use actix_web::{get, web, HttpResponse, Responder};
-use crate::{observability::{HealthStatus, Metrics}, RqDbPool};
+use crate::RqDbPool;
 use serde_json::json;
 
 /// Health check endpoint for load balancers
 #[get("")]
-pub async fn health_check(
-    pool: RqDbPool,
-    metrics: web::Data<Metrics>,
-) -> impl Responder {
-    let health = HealthStatus::check(&metrics, &pool).await;
-    
-    if health.status == "healthy" {
-        HttpResponse::Ok().json(health)
-    } else {
-        HttpResponse::ServiceUnavailable().json(health)
+pub async fn health_check(pool: RqDbPool) -> impl Responder {
+    // Simple health check - try to get a database connection
+    match pool.get() {
+        Ok(_) => HttpResponse::Ok().json(json!({
+            "status": "healthy",
+            "database": "connected"
+        })),
+        Err(_) => HttpResponse::ServiceUnavailable().json(json!({
+            "status": "unhealthy",
+            "database": "disconnected"
+        }))
     }
 }
 
 /// Readiness check - more detailed than health check
 #[get("/ready")]
-pub async fn readiness_check(
-    pool: RqDbPool,
-    metrics: web::Data<Metrics>,
-) -> impl Responder {
-    let health = HealthStatus::check(&metrics, &pool).await;
-    
-    // Additional readiness checks could go here
-    // For example, checking if background tasks are running
-    
-    if health.status == "healthy" {
-        HttpResponse::Ok().json(json!({
+pub async fn readiness_check(pool: RqDbPool) -> impl Responder {
+    match pool.get() {
+        Ok(_) => HttpResponse::Ok().json(json!({
             "status": "ready",
-            "health": health,
-            "background_tasks": {
-                "feed_monitor": "running",
-                "email_sender": "running"
-            }
-        }))
-    } else {
-        HttpResponse::ServiceUnavailable().json(json!({
+            "database": "connected"
+        })),
+        Err(_) => HttpResponse::ServiceUnavailable().json(json!({
             "status": "not_ready",
-            "health": health,
-            "background_tasks": {
-                "feed_monitor": "unknown",
-                "email_sender": "unknown"
-            }
+            "database": "disconnected"
         }))
     }
 }
 
 /// Liveness check - simple check to see if the app is alive
 #[get("/live")]
-pub async fn liveness_check(metrics: web::Data<Metrics>) -> impl Responder {
+pub async fn liveness_check() -> impl Responder {
     HttpResponse::Ok().json(json!({
         "status": "alive",
-        "version": env!("CARGO_PKG_VERSION"),
-        "uptime_seconds": metrics.uptime_seconds()
+        "version": env!("CARGO_PKG_VERSION")
     }))
 }
 
-/// Metrics endpoint for monitoring systems
+/// Basic metrics endpoint
 #[get("/metrics")]
-pub async fn metrics_endpoint(
-    pool: RqDbPool,
-    metrics: web::Data<Metrics>,
-) -> impl Responder {
-    let health = HealthStatus::check(&metrics, &pool).await;
+pub async fn metrics_endpoint(pool: RqDbPool) -> impl Responder {
+    let db_status = if pool.get().is_ok() { 1 } else { 0 };
     
-    // Basic metrics in Prometheus-like format
     let prometheus_metrics = format!(
-        "# HELP mailfeed_uptime_seconds Application uptime in seconds\n\
-         # TYPE mailfeed_uptime_seconds counter\n\
-         mailfeed_uptime_seconds {}\n\
-         \n\
-         # HELP mailfeed_health_status Application health status (1=healthy, 0=unhealthy)\n\
-         # TYPE mailfeed_health_status gauge\n\
-         mailfeed_health_status {}\n\
-         \n\
-         # HELP mailfeed_database_status Database health status (1=healthy, 0=unhealthy)\n\
+        "# HELP mailfeed_database_status Database health status (1=healthy, 0=unhealthy)\n\
          # TYPE mailfeed_database_status gauge\n\
-         mailfeed_database_status {}\n\
-         \n\
-         # HELP mailfeed_storage_status Storage health status (1=healthy, 0=unhealthy)\n\
-         # TYPE mailfeed_storage_status gauge\n\
-         mailfeed_storage_status {}\n",
-        health.uptime_seconds,
-        if health.status == "healthy" { 1 } else { 0 },
-        if health.checks.database == "healthy" { 1 } else { 0 },
-        if health.checks.storage == "healthy" { 1 } else { 0 }
+         mailfeed_database_status {}\n",
+        db_status
     );
     
     HttpResponse::Ok()

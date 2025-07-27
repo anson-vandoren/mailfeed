@@ -3,9 +3,10 @@ use crate::{
     models::{feed::Feed, subscription::Subscription},
     RqDbPool,
 };
+use serde_json;
 
 use super::types::{RqFeedId, ValidateFeedRequest, ValidateFeedResponse};
-use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpResponse, Responder};
 use reqwest;
 use feed_rs::parser;
 
@@ -99,14 +100,38 @@ pub async fn validate_feed(req: web::Json<ValidateFeedRequest>, _claims: Session
 }
 
 #[get("")]
-pub async fn get_all_feeds() -> impl Responder {
-    HttpResponse::Ok().body("get_all_feeds")
+pub async fn get_all_feeds(pool: RqDbPool, claims: SessionClaims) -> impl Responder {
+    // Only admins can view all feeds
+    if claims.role != "admin" {
+        return HttpResponse::Forbidden().json(serde_json::json!({
+            "error": {
+                "code": "FORBIDDEN", 
+                "message": "Admin access required"
+            }
+        }));
+    }
+
+    let mut conn = match pool.get() {
+        Ok(conn) => conn,
+        Err(_) => return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": {
+                "code": "DATABASE_ERROR",
+                "message": "Database connection failed"
+            }
+        }))
+    };
+
+    match Feed::get_all(&mut conn) {
+        Some(feeds) => HttpResponse::Ok().json(feeds),
+        None => HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": {
+                "code": "DATABASE_ERROR", 
+                "message": "Failed to retrieve feeds"
+            }
+        }))
+    }
 }
 
-#[post("")]
-pub async fn create_feed() -> impl Responder {
-    HttpResponse::Ok().body("create_feed")
-}
 
 #[get("/{feed_id}")]
 pub async fn get_feed(pool: RqDbPool, feed_path: RqFeedId, claims: SessionClaims) -> impl Responder {
@@ -125,39 +150,37 @@ pub async fn get_feed(pool: RqDbPool, feed_path: RqFeedId, claims: SessionClaims
         }
     };
 
-    let user_id = claims.sub;
+    // Admins can view any feed, regular users need a subscription
+    if claims.role == "admin" {
+        let feed = Feed::get_by_id(&mut conn, feed_id);
+        match feed {
+            Some(f) => HttpResponse::Ok().json(f),
+            None => HttpResponse::NotFound().body("Feed not found")
+        }
+    } else {
+        // Regular users can only view feeds they're subscribed to
+        let user_id = claims.sub;
+        let subscription = Subscription::get_for_user_and_feed(&mut conn, user_id, feed_id);
 
-    let subscription = Subscription::get_for_user_and_feed(&mut conn, user_id, feed_id);
+        if subscription.is_err() {
+            return HttpResponse::InternalServerError().body("Error getting feed");
+        }
 
-    if subscription.is_err() {
-        return HttpResponse::InternalServerError().body("Error getting feed");
+        let subscription = subscription.unwrap();
+
+        if subscription.is_none() {
+            return HttpResponse::NotFound().body("Feed not found");
+        }
+
+        let feed = Feed::get_by_id(&mut conn, feed_id);
+
+        if feed.is_none() {
+            return HttpResponse::NotFound().body("Feed not found");
+        }
+
+        let feed = feed.unwrap();
+
+        HttpResponse::Ok().json(feed)
     }
-
-    let subscription = subscription.unwrap();
-
-    if subscription.is_none() {
-        return HttpResponse::NotFound().body("Feed not found");
-    }
-
-    let subscription = subscription.unwrap();
-
-    let feed = Feed::get_by_id(&mut conn, subscription.feed_id);
-
-    if feed.is_none() {
-        return HttpResponse::NotFound().body("Feed not found");
-    }
-
-    let feed = feed.unwrap();
-
-    HttpResponse::Ok().json(feed)
 }
 
-#[patch("/{feed_id}")]
-pub async fn update_feed() -> impl Responder {
-    HttpResponse::Ok().body("update_feed")
-}
-
-#[delete("/{feed_id}")]
-pub async fn delete_feed() -> impl Responder {
-    HttpResponse::Ok().body("delete_feed")
-}

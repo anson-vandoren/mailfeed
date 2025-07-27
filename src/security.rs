@@ -1,6 +1,6 @@
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    Error, HttpResponse,
+    Error,
 };
 use futures_util::future::LocalBoxFuture;
 use std::{
@@ -79,11 +79,11 @@ where
                 actix_web::http::header::HeaderValue::from_static("strict-origin-when-cross-origin"),
             );
             
-            // Content Security Policy - restrictive but allows inline styles for UI framework
+            // Content Security Policy - allows HTMX, Tailwind CDNs, and Google Fonts
             headers.insert(
                 actix_web::http::header::HeaderName::from_static("content-security-policy"),
                 actix_web::http::header::HeaderValue::from_static(
-                    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'"
+                    "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://fonts.gstatic.com; font-src 'self' https://fonts.gstatic.com"
                 ),
             );
 
@@ -127,14 +127,12 @@ pub mod validation {
         }
         
         // Additional security: block local/private IPs in production
-        if cfg!(not(debug_assertions)) {
-            if url.contains("localhost") || 
+        if cfg!(not(debug_assertions)) && (url.contains("localhost") || 
                url.contains("127.0.0.1") || 
                url.contains("192.168.") || 
                url.contains("10.") ||
-               url.contains("172.16.") {
-                return Err("Private/local URLs not allowed in production".to_string());
-            }
+               url.contains("172.16.")) {
+            return Err("Private/local URLs not allowed in production".to_string());
         }
         
         Ok(())
@@ -174,22 +172,10 @@ pub mod validation {
         
         Ok(())
     }
-    
-    /// Sanitize text input by removing/escaping dangerous characters
-    pub fn sanitize_text(input: &str) -> String {
-        input
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-            .replace('\'', "&#x27;")
-            .replace('&', "&amp;")
-            .trim()
-            .to_string()
-    }
 }
 
 /// Rate limiting configuration for different endpoints
-pub use actix_governor::{Governor, GovernorConfigBuilder, GovernorConfig};
+pub use actix_governor::{GovernorConfigBuilder, GovernorConfig};
 
 pub fn create_rate_limiter() -> GovernorConfig<actix_governor::PeerIpKeyExtractor, actix_governor::governor::middleware::StateInformationMiddleware> {
     // General rate limiting for API endpoints

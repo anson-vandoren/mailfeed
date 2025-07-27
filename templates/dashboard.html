@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Mailfeed{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+    <!-- App Bar (Navigation) -->
+    <header class="app-bar">
+        <div class="app-bar-lead">
+            <a href="/" class="h2 flex items-center gap-2" style="text-decoration: none; color: inherit;">
+                📰 <span class="hidden sm:inline">MailFeed</span>
+            </a>
+        </div>
+        <div class="app-bar-trail">
+            <!-- Light Switch -->
+            <button onclick="toggleTheme()" class="lightswitch" title="Toggle theme">
+                <div class="lightswitch-thumb"></div>
+            </button>
+            
+            <!-- Desktop navigation -->
+            <div class="hidden sm:flex items-center gap-2">
+                <a href="/config" class="btn-sm variant-outline-tertiary">Configuration</a>
+                <a href="/settings" class="btn-sm variant-outline-secondary">Settings</a>
+                <button hx-post="/auth/logout" 
+                        hx-target="#main"
+                        class="btn-sm variant-ghost-primary">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main content -->
+    <main style="flex: 1; padding: 1.5rem;">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <!-- Add new subscription form -->
+            <div class="card p-6 mb-6">
+                <h2 class="h3 mb-4">📡 Add New Subscription</h2>
+                
+                <form hx-post="/subscriptions" 
+                      hx-target="#subscriptions-list" 
+                      hx-swap="afterbegin"
+                      hx-indicator="#add-spinner"
+                      class="space-y-4">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <label class="label">
+                            <span>Feed URL *</span>
+                            <input type="url" 
+                                   name="url" 
+                                   id="url" 
+                                   required
+                                   class="input"
+                                   placeholder="https://example.com/rss">
+                        </label>
+                        
+                        <label class="label">
+                            <span>Frequency</span>
+                            <select name="frequency" 
+                                    id="frequency" 
+                                    class="select">
+                                <option value="realtime">⚡ Realtime</option>
+                                <option value="hourly" selected>🕐 Hourly</option>
+                                <option value="daily">📅 Daily</option>
+                            </select>
+                        </label>
+                        
+                        <label class="label">
+                            <span>Custom Name</span>
+                            <input type="text" 
+                                   name="friendly_name" 
+                                   id="friendly_name"
+                                   class="input"
+                                   placeholder="My favorite blog">
+                        </label>
+                    </div>
+                    
+                    <div class="flex justify-end mt-6">
+                        <button type="submit" 
+                                class="btn variant-filled-primary">
+                            <span id="add-spinner" class="htmx-indicator">
+                                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </span>
+                            ➕ Add Subscription
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Subscriptions list -->
+            <div class="card p-6">
+                <div class="border-b border-surface-300-600-token pb-4 mb-6">
+                    <h2 class="h3">📋 Your Subscriptions</h2>
+                </div>
+                
+                <div id="subscriptions-list" class="space-y-3">
+                    {% for sub in subscriptions %}
+                        {% include "subscription_item.html" %}
+                    {% endfor %}
+                    
+                    {% if subscriptions.len() == 0 %}
+                    <div class="text-center py-12 text-surface-500-400-token">
+                        <div class="text-6xl mb-4">📡</div>
+                        <p class="text-lg mb-2">No subscriptions yet</p>
+                        <p class="text-sm">Add your first RSS feed above to get started!</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

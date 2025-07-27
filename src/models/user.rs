@@ -301,10 +301,9 @@ impl User {
 
 #[cfg(test)]
 mod tests {
-    use chrono::Utc;
 
     use super::*;
-    use crate::test_helpers::test_helpers::get_test_db_connection;
+    use crate::test_helpers::get_test_db_connection;
 
     #[test]
     fn test_create_user() {
@@ -318,7 +317,6 @@ mod tests {
             sub: 0,
             email: new_user.email.clone(),
             role: "admin".into(),
-            exp: (Utc::now().timestamp() + 1000) as usize,
         };
 
         let result = User::create(&mut conn, &new_user, claims.clone());
@@ -336,7 +334,7 @@ mod tests {
         assert_eq!(user.login_email, new_user.email);
         assert_eq!(user.send_email, new_user.email);
         assert_ne!(user.password, new_user.password);
-        assert_eq!(user.is_active, true);
+        assert!(user.is_active);
         assert_eq!(user.role, "user");
     }
 
@@ -352,7 +350,6 @@ mod tests {
             sub: 0,
             email: new_user.email.clone(),
             role: "user".into(),
-            exp: (Utc::now().timestamp() + 1000) as usize,
         };
 
         let result = User::create(&mut conn, &new_user, claims);
@@ -371,7 +368,6 @@ mod tests {
             sub: 0,
             email: new_user.email.clone(),
             role: "admin".into(),
-            exp: (Utc::now().timestamp() + 1000) as usize,
         };
 
         let result = User::create(&mut conn, &new_user, claims);
@@ -393,7 +389,6 @@ mod tests {
             sub: 0,
             email: new_user.email.clone(),
             role: "admin".into(),
-            exp: (Utc::now().timestamp() + 1000) as usize,
         };
 
         let result = User::create(&mut conn, &new_user, claims);
@@ -403,7 +398,7 @@ mod tests {
         assert_eq!(existing_user.login_email, new_user.email);
         assert_eq!(existing_user.send_email, new_user.email);
         assert_ne!(existing_user.password, new_user.password);
-        assert_eq!(existing_user.is_active, true);
+        assert!(existing_user.is_active);
         assert_eq!(existing_user.role, "user");
 
         let user = PartialUser {
@@ -413,6 +408,8 @@ mod tests {
             role: None,
             daily_send_time: None,
             refresh_token: Some("some refresh token".into()),
+            telegram_chat_id: None,
+            telegram_username: None,
         };
 
         let result = User::update(&mut conn, existing_user.id, &user);
@@ -422,7 +419,7 @@ mod tests {
         assert_eq!(user.login_email, "myNewEmail@ok.yup");
         assert_eq!(user.send_email, "test@me.com");
         assert_ne!(user.password, "password");
-        assert_eq!(user.is_active, true);
+        assert!(user.is_active);
         assert_eq!(user.role, "user");
     }
 
@@ -438,7 +435,6 @@ mod tests {
             sub: 0,
             email: new_user.email.clone(),
             role: "admin".into(),
-            exp: (Utc::now().timestamp() + 1000) as usize,
         };
 
         let result = User::create(&mut conn, &new_user, claims.clone());
@@ -463,7 +459,6 @@ mod tests {
             sub: 0,
             email: "admin".into(),
             role: "admin".into(),
-            exp: (Utc::now().timestamp() + 1000) as usize,
         };
 
         let result = User::create(&mut conn, &new_user, claims);
@@ -476,7 +471,6 @@ mod tests {
             sub: 0,
             email: new_user.email.clone(),
             role: "user".into(),
-            exp: (Utc::now().timestamp() + 1000) as usize,
         };
 
         let result = User::delete(&mut conn, user.id, claims);
@@ -487,7 +481,6 @@ mod tests {
             sub: user.id,
             email: new_user.email.clone(),
             role: "user".into(),
-            exp: (Utc::now().timestamp() + 1000) as usize,
         };
 
         let result = User::delete(&mut conn, user.id, claims);

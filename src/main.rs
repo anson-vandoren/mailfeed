@@ -5,24 +5,23 @@ mod claims;
 mod errors;
 mod global;
 mod models;
-mod observability;
 mod schema;
 mod security;
 mod session;
 mod tasks;
 mod telegram;
+#[cfg(test)]
 mod test_helpers;
 mod types;
+mod web_ui;
 
 use crate::session::SessionClaims;
 use crate::global::init_jwt_secret;
 use crate::models::user::{NewUser, PartialUser, User};
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_governor::{Governor, GovernorConfigBuilder};
-use actix_web::{middleware, web, App, HttpResponse, HttpServer};
-use actix_web::http::header;
-use chrono::Utc;
+use actix_governor::Governor;
+use actix_web::{middleware, web, App, HttpServer};
 use clap::Parser;
 use diesel::{
     prelude::*,
@@ -48,7 +47,8 @@ fn main() -> std::io::Result<()> {
     dotenv().ok();
     
     // Initialize structured logging
-    observability::init_logging();
+    // Initialize simple logging
+    env_logger::init();
 
     let config = load_config();
 
@@ -182,7 +182,7 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
     tracing::info!("Starting server at http://127.0.0.1:{}", port);
     
     // Initialize metrics
-    let metrics = web::Data::new(observability::Metrics::new());
+    // Removed metrics - keeping simple
 
     tokio::spawn(tasks::feed_monitor::runner::start(db_pool.clone()));
     tokio::spawn(tasks::telegram_sender::runner::start(db_pool.clone()));
@@ -208,7 +208,6 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
             .wrap(security::SecurityHeaders) // Add security headers
             .wrap(cors)
             .app_data(web::Data::new(db_pool.clone()))
-            .app_data(metrics.clone())
             .service(
                 web::scope("/api/auth")
                     .wrap(Governor::new(&auth_rate_limiter)) // Strict rate limiting for auth
@@ -228,7 +227,8 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
                     .service(api::config::routes())
                     .service(api::feed_items::routes())
             )
-            .service(Files::new("/", &public_path).index_file("index.html"))
+            .service(web_ui::routes()) // Web UI routes
+            .service(Files::new("/static", &public_path))
     })
     .workers(1)
     .bind(("127.0.0.1", port))?

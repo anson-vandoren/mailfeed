@@ -5,6 +5,3 @@ pub mod feeds;
 pub mod health;
 pub mod subscriptions;
 pub mod users;
-
-mod routes;
-pub use self::routes::routes;

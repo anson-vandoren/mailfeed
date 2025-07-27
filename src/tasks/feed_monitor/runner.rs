@@ -124,7 +124,7 @@ fn parse_and_insert(conn: &mut SqliteConnection, body: &str, feed: &Feed) {
         let pub_date: i32 = entry.published.map(|p| p.timestamp() as i32).unwrap_or(0);
 
         // entry.authors may be an empty Vec
-        let author = entry.authors.get(0).map(|a| a.name.as_str());
+        let author = entry.authors.first().map(|a| a.name.as_str());
         let description = entry.summary.map(|s| s.content);
 
         let item = NewFeedItem {

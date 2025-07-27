@@ -192,7 +192,7 @@ impl Setting {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_helpers::test_helpers::get_test_db_connection;
+    use crate::test_helpers::get_test_db_connection;
 
     use super::*;
 

@@ -1,4 +1,4 @@
-use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
+use actix_web::{delete, get, patch, post, web, HttpResponse};
 
 use super::types::{RqSubId, SubscriptionCreate, SubscriptionResponse, SubscriptionUpdate};
 use crate::{
@@ -62,7 +62,7 @@ pub async fn create_subscription(
     
     // Validate max_items
     if let Some(max_items) = sub_req.max_items {
-        if max_items < 1 || max_items > 100 {
+        if !(1..=100).contains(&max_items) {
             return Err(AppError::invalid_input("max_items", "Must be between 1 and 100"));
         }
     }
@@ -112,10 +112,6 @@ pub async fn create_subscription(
     Ok(HttpResponse::Ok().json(res))
 }
 
-#[get("/{sub_id}")]
-pub async fn get_subscription() -> impl Responder {
-    HttpResponse::Ok().body("get_subscription")
-}
 
 #[patch("/{sub_id}")]
 pub async fn update_subscription(

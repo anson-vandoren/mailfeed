@@ -1,0 +1,45 @@
+<div id="subscription-{{ sub.subscription.id }}" class="card p-4 mb-3 border border-surface-300-600-token bg-surface-50-950-token hover:bg-surface-100-800-token transition-colors">
+    <div class="flex justify-between items-start gap-4">
+        <div class="flex-1 space-y-2">
+            <h3 class="h4">
+                {% if sub.subscription.friendly_name != "" %}
+                    {{ sub.subscription.friendly_name }}
+                {% else %}
+                    {{ sub.feed.title }}
+                {% endif %}
+            </h3>
+            <p class="text-sm text-surface-600-300-token break-all">
+                {{ sub.feed.url }}
+            </p>
+            <div class="flex flex-wrap gap-4 text-xs text-surface-500-400-token">
+                <span class="chip variant-soft-primary capitalize">{{ sub.subscription.frequency }}</span>
+                <span class="chip variant-soft-secondary">{{ sub.subscription.max_items }} items</span>
+                <span class="flex items-center gap-1">
+                    {% if sub.subscription.is_active %}
+                        <span class="w-2 h-2 bg-success-500 rounded-full"></span>
+                        <span class="text-success-600-300-token font-medium">Active</span>
+                    {% else %}
+                        <span class="w-2 h-2 bg-surface-400 rounded-full"></span>
+                        <span class="text-surface-500-400-token">Inactive</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        
+        <div class="flex gap-2 flex-shrink-0">
+            <button hx-get="/subscriptions/{{ sub.subscription.id }}/edit"
+                    hx-target="#subscription-{{ sub.subscription.id }}"
+                    class="btn text-xs px-2 py-1 variant-ghost-surface">
+                ✏️ Edit
+            </button>
+            
+            <button hx-delete="/subscriptions/{{ sub.subscription.id }}"
+                    hx-target="#subscription-{{ sub.subscription.id }}"
+                    hx-swap="outerHTML"
+                    hx-confirm="Are you sure you want to delete this subscription?"
+                    class="btn text-xs px-2 py-1 variant-filled-error">
+                🗑️ Delete
+            </button>
+        </div>
+    </div>
+</div>

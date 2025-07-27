@@ -137,7 +137,7 @@ impl FeedItem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::test_helpers::get_test_db_connection;
+    use crate::test_helpers::get_test_db_connection;
 
     fn insert_items(conn: &mut SqliteConnection, num_items: i32, feed_id: i32) -> Vec<FeedItem> {
         let mut inserted = Vec::new();

@@ -1,5 +1,5 @@
 use actix_web::{HttpResponse, ResponseError};
-use diesel::{r2d2, SqliteConnection};
+use diesel::r2d2;
 use serde_json::json;
 use std::fmt;
 
@@ -19,7 +19,6 @@ pub enum AppError {
     
     // Feed-related Errors  
     FeedAlreadySubscribed,
-    FeedNotFound,
     FeedParseError,
     
     // Database Errors
@@ -32,7 +31,6 @@ pub enum AppError {
     
     // System Errors
     InternalError,
-    ConfigurationError,
 }
 
 impl fmt::Display for AppError {
@@ -51,7 +49,6 @@ impl fmt::Display for AppError {
             
             // Feed-related Errors
             AppError::FeedAlreadySubscribed => write!(f, "Already subscribed to this feed"),
-            AppError::FeedNotFound => write!(f, "Feed not found or inaccessible"),
             AppError::FeedParseError => write!(f, "Unable to parse feed - invalid format"),
             
             // Database Errors
@@ -64,7 +61,6 @@ impl fmt::Display for AppError {
             
             // System Errors
             AppError::InternalError => write!(f, "An unexpected error occurred - please try again"),
-            AppError::ConfigurationError => write!(f, "System configuration error - contact support"),
         }
     }
 }
@@ -88,13 +84,11 @@ impl ResponseError for AppError {
             
             // 404 Not Found
             AppError::ResourceNotFound { .. } => (404, "RESOURCE_NOT_FOUND", self.to_string()),
-            AppError::FeedNotFound => (404, "FEED_NOT_FOUND", self.to_string()),
             
             // 500 Internal Server Error
             AppError::DatabaseError => (500, "DATABASE_ERROR", self.to_string()),
             AppError::ConnectionPoolError => (500, "CONNECTION_POOL_ERROR", self.to_string()),
             AppError::InternalError => (500, "INTERNAL_ERROR", self.to_string()),
-            AppError::ConfigurationError => (500, "CONFIGURATION_ERROR", self.to_string()),
             
             // 502 Bad Gateway
             AppError::NetworkError => (502, "NETWORK_ERROR", self.to_string()),

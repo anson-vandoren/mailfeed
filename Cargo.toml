@@ -13,6 +13,8 @@ actix-rt = "2.10.0"
 actix-web = "4.11.0"
 actix-web-httpauth = "0.8.2"
 argon2 = "0.5.3"
+askama = "0.12.1"
+askama_actix = "0.14.0"
 base64 = "0.21.7"
 chrono = "0.4.41"
 clap = { version = "4.5.41", features = ["derive"] }
@@ -41,10 +43,16 @@ reqwest = { version = "0.11.27", features = ["json"] }
 rpassword = "7.4.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.141"
+tempfile = "3.8.1"
 thiserror = "1.0.69"
 tokio = "1.46.1"
 url = "2.5.4"
 uuid = { version = "1.17", features = ["v4", "serde"] }
 
 [dev-dependencies]
+actix-rt = "2.10.0"
 ctor = "0.2.9"
+reqwest = { version = "0.11.27", features = ["json"] }
+serde_json = "1.0.141"
+tempfile = "3.8.1"
+tokio-test = "0.4.3"

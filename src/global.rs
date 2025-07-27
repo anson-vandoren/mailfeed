@@ -48,7 +48,7 @@ fn generate_jwt_secret() -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_helpers::test_helpers::get_test_db_connection;
+    use crate::test_helpers::get_test_db_connection;
 
     use super::*;
 
@@ -57,7 +57,7 @@ mod tests {
         let mut conn = get_test_db_connection();
         let secret = get_jwt_secret(&mut conn);
         assert_ne!(secret, None);
-        assert!(secret.unwrap().len() > 0);
+        assert!(!secret.unwrap().is_empty());
     }
 
     #[test]
@@ -75,7 +75,7 @@ mod tests {
         assert_ne!(secret, None);
 
         let res = Setting::get(&mut conn, "jwt_secret", None);
-        assert!(!res.is_err());
+        assert!(res.is_ok());
         let setting = res.unwrap();
         assert_eq!(setting.user_id, None);
     }

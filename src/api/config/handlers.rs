@@ -35,16 +35,10 @@ pub async fn get_user_config(
     };
 
     // Get user-specific settings
-    let user_settings = match Setting::get_all_for_user(&mut conn, Some(user_id)) {
-        Ok(settings) => settings,
-        Err(_) => Vec::new(),
-    };
+    let user_settings = Setting::get_all_for_user(&mut conn, Some(user_id)).unwrap_or_default();
 
     // Get system-wide settings (fallback values)
-    let system_settings = match Setting::get_all_for_user(&mut conn, None) {
-        Ok(settings) => settings,
-        Err(_) => Vec::new(),
-    };
+    let system_settings = Setting::get_all_for_user(&mut conn, None).unwrap_or_default();
 
     // Get configuration schemas
     let schemas = get_config_schemas();

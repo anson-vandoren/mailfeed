@@ -147,10 +147,7 @@ impl Feed {
     pub fn get_all(conn: &mut SqliteConnection) -> Option<Vec<Feed>> {
         use crate::schema::feeds::dsl::feeds;
         match feeds.load::<Feed>(conn) {
-            Ok(found) => match found.len() {
-                0 => None,
-                _ => Some(found),
-            },
+            Ok(found) => Some(found), // Return empty vec instead of None
             Err(e) => {
                 log::warn!("Error getting feeds: {:?}", e);
                 None

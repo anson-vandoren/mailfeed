@@ -16,8 +16,16 @@ cd mailfeed
 # Run in development mode  
 cargo run
 
-# Run tests (basic testing present)
+# Run all tests
 cargo test
+
+# Run specific test categories
+cargo test --test integration_tests
+cargo test --test auth_tests  
+cargo test --test e2e_tests
+
+# Run unit tests only
+cargo test --lib
 
 # Create admin user (interactive CLI)
 cargo run --release -- --create-admin
@@ -122,4 +130,6 @@ npm run format
 # Dev Actions
 
 **Important: do not ever touch a file outside of the directory that this CLAUDE.md is in**
+
+**Deployment Note**: This app is designed for small, self-hosted deployments as a standalone Rust binary. No containerization (Docker) is needed or desired - the compiled binary can be deployed directly to target systems.
 

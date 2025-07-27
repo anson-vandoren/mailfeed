@@ -9,6 +9,7 @@ use diesel::{
     AsExpression,
 };
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Identifiable, Associations)]
 #[diesel(belongs_to(User))]
@@ -29,13 +30,29 @@ pub struct Subscription {
 }
 
 #[repr(i32)]
-#[derive(Debug, Serialize, Deserialize, AsExpression, Clone, Copy, FromSqlRow)]
+#[derive(Debug, Serialize, Deserialize, AsExpression, Clone, Copy, FromSqlRow, PartialEq)]
 #[diesel(sql_type=Integer)]
 #[serde(rename_all = "snake_case")]
 pub enum Frequency {
     Realtime = 0,
     Hourly = 1,
     Daily = 2,
+}
+
+impl fmt::Display for Frequency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Frequency::Realtime => write!(f, "realtime"),
+            Frequency::Hourly => write!(f, "hourly"),
+            Frequency::Daily => write!(f, "daily"),
+        }
+    }
+}
+
+impl PartialEq<&str> for Frequency {
+    fn eq(&self, other: &&str) -> bool {
+        matches!((self, *other), (Frequency::Realtime, "realtime") | (Frequency::Hourly, "hourly") | (Frequency::Daily, "daily"))
+    }
 }
 
 impl<DB> FromSql<Integer, DB> for Frequency
