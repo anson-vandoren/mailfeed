@@ -200,7 +200,7 @@ impl NewSubscription {
         {
             Ok(subscription) => Some(subscription),
             Err(e) => {
-                log::warn!("Error inserting subscription: {:?}", e);
+                log::warn!("Error inserting subscription: {e:?}");
                 None
             }
         }
@@ -213,7 +213,7 @@ impl Subscription {
         match subscriptions.find(id).first::<Subscription>(conn) {
             Ok(subscription) => Some(subscription),
             Err(e) => {
-                log::warn!("Error getting subscription: {:?}", e);
+                log::warn!("Error getting subscription: {e:?}");
                 None
             }
         }
@@ -227,7 +227,7 @@ impl Subscription {
                 _ => Some(found),
             },
             Err(e) => {
-                log::warn!("Error getting subscriptions: {:?}", e);
+                log::warn!("Error getting subscriptions: {e:?}");
                 None
             }
         }
@@ -244,7 +244,7 @@ impl Subscription {
         {
             Ok(found) => Ok(found),
             Err(e) => {
-                log::warn!("Error getting subscriptions: {:?}", e);
+                log::warn!("Error getting subscriptions: {e:?}");
                 Err(e)
             }
         }
@@ -267,7 +267,7 @@ impl Subscription {
             Err(e) => match e {
                 diesel::result::Error::NotFound => Ok(None),
                 _ => {
-                    log::warn!("Error getting subscriptions: {:?}", e);
+                    log::warn!("Error getting subscriptions: {e:?}");
                     Err(e)
                 }
             },
@@ -286,7 +286,7 @@ impl Subscription {
         {
             Ok(subscription) => Some(subscription),
             Err(e) => {
-                log::warn!("Error updating subscription: {:?}", e);
+                log::warn!("Error updating subscription: {e:?}");
                 None
             }
         }
@@ -297,7 +297,7 @@ impl Subscription {
         match diesel::delete(subscriptions.filter(id.eq(sub_id))).execute(conn) {
             Ok(_) => true,
             Err(e) => {
-                log::warn!("Error deleting subscription: {:?}", e);
+                log::warn!("Error deleting subscription: {e:?}");
                 false
             }
         }

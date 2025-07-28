@@ -64,7 +64,7 @@ impl EmailConfig {
             Ok(config) => Some(config),
             Err(diesel::result::Error::NotFound) => None,
             Err(e) => {
-                log::warn!("Error getting email config for user {}: {:?}", target_user_id, e);
+                log::warn!("Error getting email config for user {target_user_id}: {e:?}");
                 None
             }
         }
@@ -97,30 +97,33 @@ impl EmailConfig {
     }
 }
 
+/// Configuration parameters for creating a new EmailConfig
+#[derive(Debug)]
+pub struct EmailConfigParams {
+    pub smtp_host: String,
+    pub smtp_port: i32,
+    pub smtp_username: String,
+    pub plain_password: String,
+    pub smtp_use_tls: bool,
+    pub from_email: String,
+    pub from_name: Option<String>,
+}
+
 impl NewEmailConfig {
     /// Create a new email config with encrypted password
-    pub fn new(
-        user_id: i32,
-        smtp_host: String,
-        smtp_port: i32,
-        smtp_username: String,
-        plain_password: &str,
-        smtp_use_tls: bool,
-        from_email: String,
-        from_name: Option<String>,
-    ) -> Result<Self, String> {
-        let encrypted_password = encrypt_password(plain_password)?;
+    pub fn new(user_id: i32, params: EmailConfigParams) -> Result<Self, String> {
+        let encrypted_password = encrypt_password(&params.plain_password)?;
         let now = Utc::now().timestamp() as i32;
         
         Ok(Self {
             user_id,
-            smtp_host,
-            smtp_port,
-            smtp_username,
+            smtp_host: params.smtp_host,
+            smtp_port: params.smtp_port,
+            smtp_username: params.smtp_username,
             smtp_password: encrypted_password,
-            smtp_use_tls,
-            from_email,
-            from_name,
+            smtp_use_tls: params.smtp_use_tls,
+            from_email: params.from_email,
+            from_name: params.from_name,
             is_active: true,
             created_at: now,
             updated_at: now,
@@ -137,34 +140,71 @@ impl NewEmailConfig {
     }
 }
 
+/// Configuration parameters for updating an EmailConfig
+#[derive(Debug, Default)]
+pub struct PartialEmailConfigParams {
+    pub smtp_host: Option<String>,
+    pub smtp_port: Option<i32>,
+    pub smtp_username: Option<String>,
+    pub plain_password: Option<String>,
+    pub smtp_use_tls: Option<bool>,
+    pub from_email: Option<String>,
+    pub from_name: Option<String>,
+    pub is_active: Option<bool>,
+}
+
 impl PartialEmailConfig {
     /// Create a partial update with encrypted password if provided
-    pub fn new_with_password(
-        smtp_host: Option<String>,
-        smtp_port: Option<i32>,
-        smtp_username: Option<String>,
-        plain_password: Option<&str>,
-        smtp_use_tls: Option<bool>,
-        from_email: Option<String>,
-        from_name: Option<String>,
-        is_active: Option<bool>,
-    ) -> Result<Self, String> {
-        let encrypted_password = match plain_password {
+    pub fn new_with_password(params: PartialEmailConfigParams) -> Result<Self, String> {
+        let encrypted_password = match params.plain_password.as_deref() {
             Some(password) => Some(encrypt_password(password)?),
             None => None,
         };
         
         Ok(Self {
-            smtp_host,
-            smtp_port,
-            smtp_username,
+            smtp_host: params.smtp_host,
+            smtp_port: params.smtp_port,
+            smtp_username: params.smtp_username,
             smtp_password: encrypted_password,
-            smtp_use_tls,
-            from_email,
-            from_name,
-            is_active,
+            smtp_use_tls: params.smtp_use_tls,
+            from_email: params.from_email,
+            from_name: params.from_name,
+            is_active: params.is_active,
             updated_at: Some(Utc::now().timestamp() as i32),
         })
+    }
+}
+
+/// Validation for email configuration parameters
+impl EmailConfigParams {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.smtp_host.trim().is_empty() {
+            return Err("SMTP host is required".into());
+        }
+        
+        if self.smtp_port <= 0 || self.smtp_port > 65535 {
+            return Err("SMTP port must be between 1 and 65535".into());
+        }
+        
+        if self.smtp_username.trim().is_empty() {
+            return Err("SMTP username is required".into());
+        }
+        
+        if self.from_email.trim().is_empty() {
+            return Err("From email is required".into());
+        }
+        
+        // Validate email format using security module
+        crate::security::validation::validate_email(&self.from_email)?;
+        
+        // Validate SMTP host format
+        use regex::Regex;
+        let host_regex = Regex::new(r"^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$").unwrap();
+        if !host_regex.is_match(&self.smtp_host) {
+            return Err("Invalid SMTP host format".into());
+        }
+        
+        Ok(())
     }
 }
 

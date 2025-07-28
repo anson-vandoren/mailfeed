@@ -50,8 +50,7 @@ pub async fn metrics_endpoint(pool: RqDbPool) -> impl Responder {
     let prometheus_metrics = format!(
         "# HELP mailfeed_database_status Database health status (1=healthy, 0=unhealthy)\n\
          # TYPE mailfeed_database_status gauge\n\
-         mailfeed_database_status {}\n",
-        db_status
+         mailfeed_database_status {db_status}\n"
     );
     
     HttpResponse::Ok()

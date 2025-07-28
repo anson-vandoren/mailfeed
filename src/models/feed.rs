@@ -114,7 +114,7 @@ impl<'a> NewFeed<'a> {
         match diesel::insert_into(feeds).values(self).get_result(conn) {
             Ok(feed) => Some(feed),
             Err(e) => {
-                log::warn!("Error inserting feed: {:?}", e);
+                log::warn!("Error inserting feed: {e:?}");
                 None
             }
         }
@@ -127,7 +127,7 @@ impl Feed {
         match feeds.find(id).first::<Feed>(conn) {
             Ok(feed) => Some(feed),
             Err(e) => {
-                log::warn!("Error getting feed: {:?}", e);
+                log::warn!("Error getting feed: {e:?}");
                 None
             }
         }
@@ -138,7 +138,7 @@ impl Feed {
         match feeds.filter(url_col.eq(url)).first::<Feed>(conn) {
             Ok(feed) => Some(feed),
             Err(e) => {
-                log::info!("Requested feed w/ URL '{}' not found: {:?}", url, e);
+                log::info!("Requested feed w/ URL '{url}' not found: {e:?}");
                 None
             }
         }
@@ -149,7 +149,7 @@ impl Feed {
         match feeds.load::<Feed>(conn) {
             Ok(found) => Some(found), // Return empty vec instead of None
             Err(e) => {
-                log::warn!("Error getting feeds: {:?}", e);
+                log::warn!("Error getting feeds: {e:?}");
                 None
             }
         }
@@ -163,7 +163,7 @@ impl Feed {
         {
             Ok(feed) => Some(feed),
             Err(e) => {
-                log::warn!("Error updating feed: {:?}", e);
+                log::warn!("Error updating feed: {e:?}");
                 None
             }
         }
@@ -174,7 +174,7 @@ impl Feed {
         match diesel::delete(feeds.filter(id.eq(feed_id))).execute(conn) {
             Ok(_) => true,
             Err(e) => {
-                log::warn!("Error deleting feed: {:?}", e);
+                log::warn!("Error deleting feed: {e:?}");
                 false
             }
         }

@@ -33,7 +33,7 @@ pub async fn validate_feed(req: web::Json<ValidateFeedRequest>, _claims: Session
     let client = match client {
         Ok(c) => c,
         Err(e) => {
-            log::error!("Failed to create HTTP client: {}", e);
+            log::error!("Failed to create HTTP client: {e}");
             return HttpResponse::Ok().json(ValidateFeedResponse {
                 valid: false,
                 title: None,
@@ -51,7 +51,7 @@ pub async fn validate_feed(req: web::Json<ValidateFeedRequest>, _claims: Session
                 valid: false,
                 title: None,
                 description: None,
-                error: Some(format!("Failed to fetch feed: {}", e)),
+                error: Some(format!("Failed to fetch feed: {e}")),
             });
         }
     };
@@ -73,7 +73,7 @@ pub async fn validate_feed(req: web::Json<ValidateFeedRequest>, _claims: Session
                 valid: false,
                 title: None,
                 description: None,
-                error: Some(format!("Failed to read response: {}", e)),
+                error: Some(format!("Failed to read response: {e}")),
             });
         }
     };
@@ -93,7 +93,7 @@ pub async fn validate_feed(req: web::Json<ValidateFeedRequest>, _claims: Session
                 valid: false,
                 title: None,
                 description: None,
-                error: Some(format!("Failed to parse feed: {}", e)),
+                error: Some(format!("Failed to parse feed: {e}")),
             })
         }
     }
@@ -145,7 +145,7 @@ pub async fn get_feed(pool: RqDbPool, feed_path: RqFeedId, claims: SessionClaims
     let mut conn = match pool.get() {
         Ok(conn) => conn,
         Err(err) => {
-            log::error!("Failed to get db connection from pool: {}", err);
+            log::error!("Failed to get db connection from pool: {err}");
             return HttpResponse::InternalServerError().body("Error connecting to database");
         }
     };

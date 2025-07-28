@@ -283,7 +283,7 @@ async fn test_subscription_management_workflow() {
     });
     
     let req = test::TestRequest::patch()
-        .uri(&format!("/api/subscriptions/{}", subscription_id))
+        .uri(&format!("/api/subscriptions/{subscription_id}"))
         .set_json(&update_data)
         .cookie(actix_web::cookie::Cookie::new("session_id", &user_session))
         .to_request();
@@ -295,7 +295,7 @@ async fn test_subscription_management_workflow() {
     
     // 4. User deletes their subscription
     let req = test::TestRequest::delete()
-        .uri(&format!("/api/subscriptions/{}", subscription_id))
+        .uri(&format!("/api/subscriptions/{subscription_id}"))
         .cookie(actix_web::cookie::Cookie::new("session_id", &user_session))
         .to_request();
     
@@ -382,7 +382,7 @@ async fn test_feed_management_workflow() {
     // 4. Admin gets specific feed
     let feed_id = feeds[0]["id"].as_i64().expect("Feed should have ID");
     let req = test::TestRequest::get()
-        .uri(&format!("/api/feeds/{}", feed_id))
+        .uri(&format!("/api/feeds/{feed_id}"))
         .cookie(actix_web::cookie::Cookie::new("session_id", &admin_session))
         .to_request();
     
@@ -436,9 +436,7 @@ async fn test_unauthorized_access_scenarios() {
         let resp = test::call_service(&app, req).await;
         assert!(
             resp.status() == 403 || resp.status() == 401,
-            "Regular user should not access admin endpoint: {} {}",
-            method,
-            endpoint
+            "Regular user should not access admin endpoint: {method} {endpoint}"
         );
     }
     

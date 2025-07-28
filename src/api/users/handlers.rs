@@ -55,7 +55,7 @@ pub async fn get_user(pool: RqDbPool, user_path: RqUserId, claims: SessionClaims
     let mut conn = match pool.get() {
         Ok(conn) => conn,
         Err(err) => {
-            log::error!("Failed to get db connection from pool: {}", err);
+            log::error!("Failed to get db connection from pool: {err}");
             return HttpResponse::InternalServerError().body("Error connecting to database");
         }
     };
@@ -106,7 +106,7 @@ pub async fn update_user(
     let mut conn = match pool.get() {
         Ok(conn) => conn,
         Err(err) => {
-            log::error!("Failed to get db connection from pool: {}", err);
+            log::error!("Failed to get db connection from pool: {err}");
             return HttpResponse::InternalServerError().body("Error connecting to database");
         }
     };
@@ -134,7 +134,7 @@ pub async fn test_telegram(pool: RqDbPool, user_path: RqUserId, claims: SessionC
     let mut conn = match pool.get() {
         Ok(conn) => conn,
         Err(err) => {
-            log::error!("Failed to get db connection from pool: {}", err);
+            log::error!("Failed to get db connection from pool: {err}");
             return HttpResponse::InternalServerError().body("Error connecting to database");
         }
     };
@@ -156,7 +156,7 @@ pub async fn test_telegram(pool: RqDbPool, user_path: RqUserId, claims: SessionC
                 
                 match client.send_html_message(chat_id, &test_message).await {
                     Ok(_) => {
-                        log::info!("Test message sent successfully to chat_id: {}", chat_id);
+                        log::info!("Test message sent successfully to chat_id: {chat_id}");
                         HttpResponse::Ok().json(serde_json::json!({
                             "success": true,
                             "message": "Test message sent successfully!",
@@ -164,7 +164,7 @@ pub async fn test_telegram(pool: RqDbPool, user_path: RqUserId, claims: SessionC
                         }))
                     }
                     Err(e) => {
-                        log::error!("Failed to send test message: {:?}", e);
+                        log::error!("Failed to send test message: {e:?}");
                         HttpResponse::Ok().json(serde_json::json!({
                             "success": false,
                             "error": format!("Failed to send message: {}", e),
@@ -174,7 +174,7 @@ pub async fn test_telegram(pool: RqDbPool, user_path: RqUserId, claims: SessionC
                 }
             }
             Err(e) => {
-                log::error!("Failed to create Telegram client: {:?}", e);
+                log::error!("Failed to create Telegram client: {e:?}");
                 HttpResponse::InternalServerError().json(serde_json::json!({
                     "success": false,
                     "error": format!("Failed to create Telegram client: {}", e)
@@ -199,7 +199,7 @@ pub async fn delete_user(pool: RqDbPool, user_path: RqUserId, claims: SessionCla
     let mut conn = match pool.get() {
         Ok(conn) => conn,
         Err(err) => {
-            log::error!("Failed to get db connection from pool: {}", err);
+            log::error!("Failed to get db connection from pool: {err}");
             return HttpResponse::InternalServerError().body("Error connecting to database");
         }
     };
@@ -208,11 +208,11 @@ pub async fn delete_user(pool: RqDbPool, user_path: RqUserId, claims: SessionCla
 
     match delete_result {
         Ok(_) => {
-            log::info!("Deleted user with ID {}", id);
+            log::info!("Deleted user with ID {id}");
             HttpResponse::Ok().body("User deleted")
         }
         Err(err) => {
-            log::error!("Error deleting user: {:?}", err);
+            log::error!("Error deleting user: {err:?}");
             if let UserTableError::UserNotFound = err {
                 return HttpResponse::NotFound().body("User not found");
             }

@@ -122,7 +122,7 @@ pub async fn login_submit(
     use crate::security::validation;
     
     // Validate input
-    if let Err(_) = validation::validate_email(&form.email) {
+    if validation::validate_email(&form.email).is_err() {
         let template = LoginTemplate { 
             error: Some("Invalid email format".to_string()) 
         };

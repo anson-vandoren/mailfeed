@@ -21,13 +21,13 @@ pub async fn start(pool: DbPool) {
         let mut conn = match pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                error!("Error getting DB connection: {:?}", e);
+                error!("Error getting DB connection: {e:?}");
                 continue;
             }
         };
 
         if let Err(e) = process_pending_emails(&mut delivery_service, &mut conn).await {
-            error!("Error in email sender: {}", e);
+            error!("Error in email sender: {e}");
         }
     }
 }
@@ -55,14 +55,14 @@ async fn process_pending_emails(
     for subscription in email_subscriptions {
         user_subscriptions
             .entry(subscription.user_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(subscription);
     }
 
     // Process each user's subscriptions
     for (user_id, subscriptions) in user_subscriptions {
         if let Err(e) = process_user_emails(delivery_service, conn, user_id, subscriptions).await {
-            error!("Failed to process emails for user {}: {}", user_id, e);
+            error!("Failed to process emails for user {user_id}: {e}");
             continue;
         }
     }
@@ -77,19 +77,19 @@ async fn process_user_emails(
     user_id: i32,
     subscriptions: Vec<Subscription>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    debug!("Processing emails for user {}", user_id);
+    debug!("Processing emails for user {user_id}");
 
     // Get user's email configuration
     let email_config = match get_user_email_config(conn, user_id)? {
         Some(config) => config,
         None => {
-            warn!("User {} has email subscriptions but no email config", user_id);
+            warn!("User {user_id} has email subscriptions but no email config");
             return Ok(());
         }
     };
 
     if !email_config.is_active {
-        debug!("Email config is inactive for user {}", user_id);
+        debug!("Email config is inactive for user {user_id}");
         return Ok(());
     }
 
@@ -103,7 +103,7 @@ async fn process_user_emails(
         
         frequency_groups
             .entry(subscription.frequency.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(subscription);
     }
 
@@ -116,7 +116,7 @@ async fn process_user_emails(
             &frequency,
             group_subscriptions
         ).await {
-            error!("Failed to process {} emails for user {}: {}", frequency, user_id, e);
+            error!("Failed to process {frequency} emails for user {user_id}: {e}");
         }
     }
 
@@ -146,7 +146,7 @@ async fn process_frequency_group(
             send_digest_emails(delivery_service, conn, email_config, frequency, subscriptions).await?;
         }
         _ => {
-            warn!("Unknown frequency: {}", frequency);
+            warn!("Unknown frequency: {frequency}");
         }
     }
 

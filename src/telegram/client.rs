@@ -38,7 +38,7 @@ impl TelegramClient {
         
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            return Err(format!("Telegram API error: {}", error_text).into());
+            return Err(format!("Telegram API error: {error_text}").into());
         }
         
         let telegram_response: TelegramResponse<serde_json::Value> = response.json().await?;

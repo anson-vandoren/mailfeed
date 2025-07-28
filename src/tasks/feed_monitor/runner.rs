@@ -17,7 +17,7 @@ pub async fn start(pool: DbPool) {
         let mut conn = match pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                log::error!("Error getting DB connection: {:?}", e);
+                log::error!("Error getting DB connection: {e:?}");
                 continue;
             }
         };
@@ -91,7 +91,7 @@ pub async fn start(pool: DbPool) {
             }
         }
         let num_feeds = feeds.len();
-        log::info!("Found {} feeds", num_feeds);
+        log::info!("Found {num_feeds} feeds");
         tokio::time::sleep(CHECK_INTERVAL).await;
     }
 }
@@ -100,7 +100,7 @@ fn parse_and_insert(conn: &mut SqliteConnection, body: &str, feed: &Feed) {
     let parsed = match feed_rs::parser::parse(body.as_bytes()) {
         Ok(parsed) => parsed,
         Err(e) => {
-            log::warn!("Error parsing feed: {:?}", e);
+            log::warn!("Error parsing feed: {e:?}");
             return;
         }
     };
@@ -108,7 +108,7 @@ fn parse_and_insert(conn: &mut SqliteConnection, body: &str, feed: &Feed) {
     // Update feed if necessary
     let feed_updates = FeedUpdates::from_feed_rs(&parsed, feed);
     if feed_updates.is_some() {
-        log::info!("Found updates: {:?}, updating feed", feed_updates);
+        log::info!("Found updates: {feed_updates:?}, updating feed");
         Feed::update(conn, feed.id, &feed_updates.into());
     }
 
@@ -144,10 +144,10 @@ fn parse_and_insert(conn: &mut SqliteConnection, body: &str, feed: &Feed) {
                 log::debug!("Item already exists: {:?}", item.link);
             }
             Err(e) => {
-                log::warn!("Error inserting item: {:?}", e);
+                log::warn!("Error inserting item: {e:?}");
             }
         }
     }
 
-    log::info!("Added {} items", num_added);
+    log::info!("Added {num_added} items");
 }

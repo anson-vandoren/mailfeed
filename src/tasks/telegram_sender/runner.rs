@@ -21,7 +21,7 @@ pub async fn start(pool: DbPool) {
         let mut conn = match pool.get() {
             Ok(conn) => conn,
             Err(e) => {
-                log::error!("Error getting DB connection: {:?}", e);
+                log::error!("Error getting DB connection: {e:?}");
                 continue;
             }
         };
@@ -30,7 +30,7 @@ pub async fn start(pool: DbPool) {
         let telegram_client = match TelegramClient::new(&mut conn) {
             Ok(client) => client,
             Err(e) => {
-                log::debug!("Telegram client not available (no token configured?): {:?}", e);
+                log::debug!("Telegram client not available (no token configured?): {e:?}");
                 continue; // Skip this iteration, try again next time
             }
         };
@@ -69,7 +69,7 @@ pub async fn start(pool: DbPool) {
                         );
                     }
                     Err(e) => {
-                        log::error!("Error sending Telegram message: {:?}", e);
+                        log::error!("Error sending Telegram message: {e:?}");
                         continue;
                     }
                 }
@@ -184,8 +184,7 @@ fn format_telegram_message(feed_data: &FeedData) -> String {
         };
         
         message.push_str(&format!(
-            "{}\n",
-            truncated_desc
+            "{truncated_desc}\n"
         ));
         
         message.push_str("─────────────\n");

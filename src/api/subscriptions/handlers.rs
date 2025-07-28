@@ -48,14 +48,14 @@ pub async fn create_subscription(
 
     // Enhanced URL validation
     if let Err(e) = validation::validate_url(&sub_req.url) {
-        log::warn!("Invalid feed URL submitted by user {}: {}", user_id, e);
+        log::warn!("Invalid feed URL submitted by user {user_id}: {e}");
         return Err(AppError::invalid_input("url", "Invalid feed URL format"));
     }
     
     // Validate friendly name if provided
     if let Some(ref name) = sub_req.friendly_name {
         if let Err(e) = validation::validate_friendly_name(name) {
-            log::warn!("Invalid friendly name submitted by user {}: {}", user_id, e);
+            log::warn!("Invalid friendly name submitted by user {user_id}: {e}");
             return Err(AppError::invalid_input("friendly_name", "Contains invalid characters"));
         }
     }

@@ -20,7 +20,7 @@ pub async fn get_user_config(
     let mut conn = match pool.get() {
         Ok(conn) => conn,
         Err(err) => {
-            log::error!("Failed to get db connection from pool: {}", err);
+            log::error!("Failed to get db connection from pool: {err}");
             return HttpResponse::InternalServerError().body("Error connecting to database");
         }
     };
@@ -135,7 +135,7 @@ pub async fn update_user_config(
     let mut conn = match pool.get() {
         Ok(conn) => conn,
         Err(err) => {
-            log::error!("Failed to get db connection from pool: {}", err);
+            log::error!("Failed to get db connection from pool: {err}");
             return HttpResponse::InternalServerError().body("Error connecting to database");
         }
     };
@@ -172,7 +172,7 @@ pub async fn bulk_update_user_config(
     let mut conn = match pool.get() {
         Ok(conn) => conn,
         Err(err) => {
-            log::error!("Failed to get db connection from pool: {}", err);
+            log::error!("Failed to get db connection from pool: {err}");
             return HttpResponse::InternalServerError().body("Error connecting to database");
         }
     };
@@ -183,14 +183,14 @@ pub async fn bulk_update_user_config(
         let schema = match schemas.iter().find(|s| s.key == *key) {
             Some(schema) => schema,
             None => {
-                errors.push(format!("Invalid configuration key: {}", key));
+                errors.push(format!("Invalid configuration key: {key}"));
                 continue;
             }
         };
 
         // Validate the value
         if let Err(error_msg) = validate_config_value(value, schema) {
-            errors.push(format!("{}: {}", key, error_msg));
+            errors.push(format!("{key}: {error_msg}"));
             continue;
         }
 
@@ -208,7 +208,7 @@ pub async fn bulk_update_user_config(
                 updated_configs.insert(setting.key, config_item);
             }
             Err(_) => {
-                errors.push(format!("Error updating {}", key));
+                errors.push(format!("Error updating {key}"));
             }
         }
     }
@@ -244,13 +244,13 @@ fn validate_config_value(value: &str, schema: &crate::api::config::types::Config
             
             if let Some(min) = validation.min {
                 if num < min {
-                    return Err(format!("Must be at least {}", min));
+                    return Err(format!("Must be at least {min}"));
                 }
             }
             
             if let Some(max) = validation.max {
                 if num > max {
-                    return Err(format!("Must be at most {}", max));
+                    return Err(format!("Must be at most {max}"));
                 }
             }
         }
@@ -262,13 +262,13 @@ fn validate_config_value(value: &str, schema: &crate::api::config::types::Config
         ConfigType::String => {
             if let Some(min) = validation.min {
                 if value.len() < min as usize {
-                    return Err(format!("Must be at least {} characters", min));
+                    return Err(format!("Must be at least {min} characters"));
                 }
             }
             
             if let Some(max) = validation.max {
                 if value.len() > max as usize {
-                    return Err(format!("Must be at most {} characters", max));
+                    return Err(format!("Must be at most {max} characters"));
                 }
             }
             

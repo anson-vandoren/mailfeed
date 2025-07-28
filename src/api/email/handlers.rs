@@ -33,34 +33,40 @@ pub async fn create_or_update_email_config(
     
     let response = if existing.is_some() {
         // Update existing config
-        let partial_config = PartialEmailConfig::new_with_password(
-            Some(form.smtp_host.clone()),
-            Some(form.smtp_port as i32),
-            Some(form.smtp_username.clone()),
-            Some(&form.smtp_password),
-            Some(form.use_tls()),
-            Some(form.from_email.clone()),
-            form.from_name.clone(),
-            Some(true), // is_active
-        ).map_err(|_e| AppError::InternalError)?;
+        let params = crate::models::email_config::PartialEmailConfigParams {
+            smtp_host: Some(form.smtp_host.clone()),
+            smtp_port: Some(form.smtp_port as i32),
+            smtp_username: Some(form.smtp_username.clone()),
+            plain_password: Some(form.smtp_password.clone()),
+            smtp_use_tls: Some(form.use_tls()),
+            from_email: Some(form.from_email.clone()),
+            from_name: form.from_name.clone(),
+            is_active: Some(true),
+        };
+        
+        let partial_config = PartialEmailConfig::new_with_password(params)
+            .map_err(|_e| AppError::InternalError)?;
         
         EmailConfig::update(&mut conn, target_user_id, &partial_config)
             .map_err(|_| AppError::DatabaseError)?
     } else {
         // Create new config
-        let new_config = NewEmailConfig::new(
-            target_user_id,
-            form.smtp_host.clone(),
-            form.smtp_port as i32,
-            form.smtp_username.clone(),
-            &form.smtp_password,
-            form.use_tls(),
-            form.from_email.clone(),
-            form.from_name.clone(),
-        ).map_err(|_e| AppError::InternalError)?;
+        let params = crate::models::email_config::EmailConfigParams {
+            smtp_host: form.smtp_host.clone(),
+            smtp_port: form.smtp_port as i32,
+            smtp_username: form.smtp_username.clone(),
+            plain_password: form.smtp_password.clone(),
+            smtp_use_tls: form.use_tls(),
+            from_email: form.from_email.clone(),
+            from_name: form.from_name.clone(),
+        };
         
-        new_config.validate()
+        // Validate parameters
+        params.validate()
             .map_err(|e| AppError::invalid_input("email_config", &e))?;
+        
+        let new_config = NewEmailConfig::new(target_user_id, params)
+            .map_err(|_e| AppError::InternalError)?;
         
         new_config.insert(&mut conn)
             .map_err(|_| AppError::DatabaseError)?
@@ -110,16 +116,19 @@ pub async fn update_email_config(
     let mut conn = pool.get().map_err(|_| AppError::ConnectionPoolError)?;
     
     // Create partial update
-    let partial_config = PartialEmailConfig::new_with_password(
-        Some(form.smtp_host.clone()),
-        Some(form.smtp_port as i32),
-        Some(form.smtp_username.clone()),
-        Some(&form.smtp_password),
-        Some(form.use_tls()),
-        Some(form.from_email.clone()),
-        form.from_name.clone(),
-        Some(true), // is_active
-    ).map_err(|_e| AppError::InternalError)?;
+    let params = crate::models::email_config::PartialEmailConfigParams {
+        smtp_host: Some(form.smtp_host.clone()),
+        smtp_port: Some(form.smtp_port as i32),
+        smtp_username: Some(form.smtp_username.clone()),
+        plain_password: Some(form.smtp_password.clone()),
+        smtp_use_tls: Some(form.use_tls()),
+        from_email: Some(form.from_email.clone()),
+        from_name: form.from_name.clone(),
+        is_active: Some(true),
+    };
+    
+    let partial_config = PartialEmailConfig::new_with_password(params)
+        .map_err(|_e| AppError::InternalError)?;
     
     let _response = EmailConfig::update(&mut conn, target_user_id, &partial_config)
         .map_err(|_| AppError::DatabaseError)?;
@@ -216,8 +225,8 @@ async fn send_test_email_impl(email_config: &EmailConfig) -> Result<(), String> 
     let email = Message::builder()
         .from(format!("{} <{}>", 
               email_config.from_name.as_deref().unwrap_or("MailFeed"), 
-              email_config.from_email).parse().map_err(|e| format!("Invalid from address: {}", e))?)
-        .to(email_config.from_email.parse().map_err(|e| format!("Invalid to address: {}", e))?)
+              email_config.from_email).parse().map_err(|e| format!("Invalid from address: {e}"))?)
+        .to(email_config.from_email.parse().map_err(|e| format!("Invalid to address: {e}"))?)
         .subject("MailFeed Test Email")
         .header(ContentType::TEXT_HTML)
         .body(r#"
@@ -236,7 +245,7 @@ async fn send_test_email_impl(email_config: &EmailConfig) -> Result<(), String> 
             </body>
             </html>
         "#.to_string())
-        .map_err(|e| format!("Failed to build email: {}", e))?;
+        .map_err(|e| format!("Failed to build email: {e}"))?;
     
     // Build SMTP transport
     let creds = Credentials::new(
@@ -246,7 +255,7 @@ async fn send_test_email_impl(email_config: &EmailConfig) -> Result<(), String> 
     
     let mailer = if email_config.smtp_use_tls {
         SmtpTransport::relay(&email_config.smtp_host)
-            .map_err(|e| format!("Failed to create SMTP relay: {}", e))?
+            .map_err(|e| format!("Failed to create SMTP relay: {e}"))?
             .port(email_config.smtp_port as u16)
             .credentials(creds)
             .build()
@@ -259,7 +268,7 @@ async fn send_test_email_impl(email_config: &EmailConfig) -> Result<(), String> 
     
     // Send email
     mailer.send(&email)
-        .map_err(|e| format!("Failed to send email: {}", e))?;
+        .map_err(|e| format!("Failed to send email: {e}"))?;
     
     Ok(())
 }

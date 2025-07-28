@@ -139,7 +139,7 @@ impl User {
         match diesel::insert_into(users).values(&user).get_result(conn) {
             Ok(in_db) => Ok(in_db),
             Err(err) => {
-                log::error!("Failed to insert user into database: {:?}", err);
+                log::error!("Failed to insert user into database: {err:?}");
                 Err(UserTableError::DatabaseError)
             }
         }
@@ -155,7 +155,7 @@ impl User {
 
     pub fn get(conn: &mut SqliteConnection, query: UserQuery) -> Option<User> {
         use crate::schema::users::dsl::*;
-        log::info!("Getting user: {:?}", query);
+        log::info!("Getting user: {query:?}");
         match query {
             UserQuery::Id(user_id) => users.filter(id.eq(user_id)).first::<User>(conn).ok(),
             UserQuery::Email(email) => users.filter(login_email.eq(email)).first::<User>(conn).ok(),
@@ -166,7 +166,7 @@ impl User {
         use crate::schema::users::dsl::*;
         log::info!("Getting all users");
         users.load::<User>(conn).map_err(|err| {
-            log::error!("Failed to get users: {:?}", err);
+            log::error!("Failed to get users: {err:?}");
             UserTableError::DatabaseError
         })
     }
@@ -178,7 +178,7 @@ impl User {
             .filter(role.eq("admin"))
             .load::<User>(conn)
             .map_err(|err| {
-                log::error!("Failed to get admins: {:?}", err);
+                log::error!("Failed to get admins: {err:?}");
                 UserTableError::DatabaseError
             })
     }
@@ -193,11 +193,11 @@ impl User {
         if let Some(update_email) = &updates.login_email {
             let user_exists = User::exists(conn, update_email);
             if user_exists {
-                log::warn!("User with email {} already exists", update_email);
+                log::warn!("User with email {update_email} already exists");
                 return Err(UserTableError::EmailExists);
             }
         }
-        log::info!("Updating user (id={:?})", user_id);
+        log::info!("Updating user (id={user_id:?})");
 
         match diesel::update(users.filter(id.eq(user_id)))
             .set(updates)
@@ -205,7 +205,7 @@ impl User {
         {
             Ok(user) => Ok(user),
             Err(err) => {
-                log::error!("Failed to update user: {:?}", err);
+                log::error!("Failed to update user: {err:?}");
                 Err(UserTableError::DatabaseError)
             }
         }
@@ -217,7 +217,7 @@ impl User {
     ) -> Result<(), UserTableError> {
         use crate::schema::users::dsl::*;
 
-        log::info!("Clearing refresh token for user: {:?}", user_id);
+        log::info!("Clearing refresh token for user: {user_id:?}");
 
         let res = match user_id {
             UserQuery::Id(user_id) => diesel::update(users.filter(id.eq(user_id)))
@@ -231,7 +231,7 @@ impl User {
         match res {
             Ok(_) => Ok(()),
             Err(err) => {
-                log::error!("Failed to clear refresh token: {:?}", err);
+                log::error!("Failed to clear refresh token: {err:?}");
                 Err(UserTableError::DatabaseError)
             }
         }
@@ -243,7 +243,7 @@ impl User {
         claims: SessionClaims,
     ) -> Result<(), UserTableError> {
         use crate::schema::users::dsl::*;
-        log::info!("Deleting user (id={})", user_id);
+        log::info!("Deleting user (id={user_id})");
 
         if claims.role != "admin" && claims.sub != user_id {
             log::warn!(
@@ -257,13 +257,13 @@ impl User {
         let deleted_rows = diesel::delete(users.filter(id.eq(user_id)))
             .execute(conn)
             .map_err(|err| {
-                log::error!("Failed to delete user: {:?}", err);
+                log::error!("Failed to delete user: {err:?}");
                 UserTableError::DatabaseError
             })
             .ok();
 
         if deleted_rows == Some(0) {
-            log::warn!("User with id {} does not exist", user_id);
+            log::warn!("User with id {user_id} does not exist");
             Err(UserTableError::UserNotFound)
         } else {
             Ok(())
@@ -321,7 +321,7 @@ mod tests {
 
         let result = User::create(&mut conn, &new_user, claims.clone());
         if let Err(e) = result {
-            panic!("Failed to create user: {:?}", e);
+            panic!("Failed to create user: {e:?}");
         }
 
         assert!(result.is_ok());

@@ -43,9 +43,9 @@ impl fmt::Display for AppError {
             AppError::Forbidden => write!(f, "Access denied"),
             
             // Validation Errors
-            AppError::InvalidInput { field, message } => write!(f, "Invalid {}: {}", field, message),
-            AppError::DuplicateResource { resource } => write!(f, "{} already exists", resource),
-            AppError::ResourceNotFound { resource } => write!(f, "{} not found", resource),
+            AppError::InvalidInput { field, message } => write!(f, "Invalid {field}: {message}"),
+            AppError::DuplicateResource { resource } => write!(f, "{resource} already exists"),
+            AppError::ResourceNotFound { resource } => write!(f, "{resource} not found"),
             
             // Feed-related Errors
             AppError::FeedAlreadySubscribed => write!(f, "Already subscribed to this feed"),
@@ -100,13 +100,13 @@ impl ResponseError for AppError {
         // Log detailed error information for debugging
         match self {
             AppError::DatabaseError | AppError::ConnectionPoolError | AppError::InternalError => {
-                log::error!("Server error: {:?}", self);
+                log::error!("Server error: {self:?}");
             }
             AppError::InvalidCredentials => {
-                log::warn!("Authentication failed: {:?}", self);
+                log::warn!("Authentication failed: {self:?}");
             }
             _ => {
-                log::info!("Client error: {:?}", self);
+                log::info!("Client error: {self:?}");
             }
         }
 
@@ -148,7 +148,7 @@ impl AppError {
 /// Convert database connection pool errors
 impl From<r2d2::Error> for AppError {
     fn from(err: r2d2::Error) -> Self {
-        log::error!("Database connection pool error: {}", err);
+        log::error!("Database connection pool error: {err}");
         AppError::ConnectionPoolError
     }
 }
@@ -163,7 +163,7 @@ impl From<diesel::result::Error> for AppError {
                 resource: "Record".to_string()
             },
             _ => {
-                log::error!("Database error: {}", err);
+                log::error!("Database error: {err}");
                 AppError::DatabaseError
             }
         }
@@ -173,7 +173,7 @@ impl From<diesel::result::Error> for AppError {
 /// Convert network/reqwest errors
 impl From<reqwest::Error> for AppError {
     fn from(err: reqwest::Error) -> Self {
-        log::error!("Network error: {}", err);
+        log::error!("Network error: {err}");
         if err.is_timeout() || err.is_connect() {
             AppError::NetworkError
         } else {
@@ -185,7 +185,7 @@ impl From<reqwest::Error> for AppError {
 /// Convert feed parsing errors
 impl From<feed_rs::parser::ParseFeedError> for AppError {
     fn from(err: feed_rs::parser::ParseFeedError) -> Self {
-        log::warn!("Feed parse error: {}", err);
+        log::warn!("Feed parse error: {err}");
         AppError::FeedParseError
     }
 }

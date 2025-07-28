@@ -292,7 +292,7 @@ async fn test_expired_token_handling() {
     
     let req = test::TestRequest::get()
         .uri("/api/users")
-        .insert_header(("Authorization", format!("Bearer {}", token)))
+        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     
     let resp = test::call_service(&app, req).await;

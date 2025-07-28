@@ -103,7 +103,7 @@ fn cli_create_user(db: &mut SqliteConnection) {
     let user = match User::create(db, &new_user, claims) {
         Ok(user) => user,
         Err(e) => {
-            println!("Failed to create user: {:?}", e);
+            println!("Failed to create user: {e:?}");
             return;
         }
     };
@@ -117,10 +117,10 @@ fn cli_create_user(db: &mut SqliteConnection) {
         Ok(user) => {
             println!("User created successfully");
             // print the user to stdout
-            println!("{:?}", user);
+            println!("{user:?}");
         }
         Err(e) => {
-            println!("Failed to update user: {:?}", e);
+            println!("Failed to update user: {e:?}");
         }
     }
 }
@@ -134,31 +134,31 @@ struct AppConfig {
 fn load_config() -> AppConfig {
     let public_path = match env::var("MF_PUBLIC_PATH") {
         Ok(path) => {
-            log::info!("Using public path from MF_PUBLIC_PATH: {}", path);
+            log::info!("Using public path from MF_PUBLIC_PATH: {path}");
             path
         }
         Err(_) => {
             let static_path = "./static";
-            log::info!("Using default static path: {}", static_path);
+            log::info!("Using default static path: {static_path}");
             static_path.to_string()
         }
     };
     let db_path = match env::var("MF_DATABASE_URL") {
         Ok(path) => {
-            log::info!("Using database path from MF_DATABASE_URL: {}", path);
+            log::info!("Using database path from MF_DATABASE_URL: {path}");
             path
         }
         Err(_) => {
             let mut path = env::current_dir().expect("Failed to get current directory");
             path.push("mailfeed.db");
             let res = path.to_str().unwrap().to_string();
-            log::info!("Using default database path: {}", res);
+            log::info!("Using default database path: {res}");
             res
         }
     };
     let port = match env::var("MF_PORT") {
         Ok(port) => {
-            log::info!("Using port from MF_PORT: {}", port);
+            log::info!("Using port from MF_PORT: {port}");
             port.parse::<u16>().expect("Failed to parse MF_PORT")
         }
         Err(_) => {
@@ -176,8 +176,8 @@ fn load_config() -> AppConfig {
 
 #[actix_web::main]
 async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io::Result<()> {
-    log::info!("Serving static files from {}", public_path);
-    log::info!("Starting server at http://127.0.0.1:{}", port);
+    log::info!("Serving static files from {public_path}");
+    log::info!("Starting server at http://127.0.0.1:{port}");
     
     // Initialize metrics
     // Removed metrics - keeping simple

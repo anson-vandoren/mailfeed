@@ -72,7 +72,7 @@ impl FromRequest for SessionClaims {
         // Extract session cookie
         let session_id = match extract_session_cookie(req) {
             Some(id) => {
-                log::debug!("Found session cookie: {}", id);
+                log::debug!("Found session cookie: {id}");
                 id
             },
             None => {
@@ -94,7 +94,7 @@ impl FromRequest for SessionClaims {
                 session
             },
             None => {
-                log::debug!("Invalid or expired session: {}", session_id);
+                log::debug!("Invalid or expired session: {session_id}");
                 return ready(Err(SessionError::InvalidSession.into()));
             },
         };

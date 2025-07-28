@@ -67,6 +67,7 @@ impl EmailDeliveryService {
     }
 
     /// Send a test email to verify configuration
+    #[allow(dead_code)]
     pub async fn send_test_email(&mut self, email_config: &EmailConfig) -> Result<(), String> {
         debug!("Sending test email to user {}", email_config.user_id);
 
@@ -111,20 +112,20 @@ impl EmailDeliveryService {
     ) -> Result<(), String> {
         // Decrypt the password
         let smtp_password = encryption::decrypt_password(&email_config.smtp_password)
-            .map_err(|e| format!("Failed to decrypt SMTP password: {}", e))?;
+            .map_err(|e| format!("Failed to decrypt SMTP password: {e}"))?;
 
         // Build the email message
         let from_mailbox = match email_config.from_name.as_ref() {
             Some(name) => Mailbox::from_str(&format!("{} <{}>", name, email_config.from_email))
-                .map_err(|e| format!("Invalid from address: {}", e))?,
+                .map_err(|e| format!("Invalid from address: {e}"))?,
             None => Mailbox::from_str(&email_config.from_email)
-                .map_err(|e| format!("Invalid from address: {}", e))?,
+                .map_err(|e| format!("Invalid from address: {e}"))?,
         };
 
         // For now, send to the from_email (user's own email)
         // In a real deployment, you might want users to specify a separate "to" email
         let to_mailbox = Mailbox::from_str(&email_config.from_email)
-            .map_err(|e| format!("Invalid to address: {}", e))?;
+            .map_err(|e| format!("Invalid to address: {e}"))?;
 
         let email = Message::builder()
             .from(from_mailbox)
@@ -132,7 +133,7 @@ impl EmailDeliveryService {
             .subject(subject)
             .header(ContentType::TEXT_HTML)
             .body(html_body.to_string())
-            .map_err(|e| format!("Failed to build email: {}", e))?;
+            .map_err(|e| format!("Failed to build email: {e}"))?;
 
         // Get or create SMTP transport
         let transport = self.get_smtp_transport(email_config, &smtp_password)?;
@@ -144,10 +145,10 @@ impl EmailDeliveryService {
                 Ok(())
             }
             Err(e) => {
-                error!("Failed to send email: {}", e);
+                error!("Failed to send email: {e}");
                 // Remove from cache if connection failed
                 self.connection_cache.remove(&email_config.user_id);
-                Err(format!("Failed to send email: {}", e))
+                Err(format!("Failed to send email: {e}"))
             }
         }
     }
@@ -159,7 +160,7 @@ impl EmailDeliveryService {
         smtp_password: &str,
     ) -> Result<&SmtpTransport, String> {
         // Check if we have a cached connection
-        if !self.connection_cache.contains_key(&email_config.user_id) {
+        if let std::collections::hash_map::Entry::Vacant(e) = self.connection_cache.entry(email_config.user_id) {
             debug!("Creating new SMTP connection for user {}", email_config.user_id);
 
             let credentials = Credentials::new(
@@ -168,7 +169,7 @@ impl EmailDeliveryService {
             );
 
             let transport_builder = SmtpTransport::relay(&email_config.smtp_host)
-                .map_err(|e| format!("Failed to create SMTP relay: {}", e))?
+                .map_err(|e| format!("Failed to create SMTP relay: {e}"))?
                 .credentials(credentials)
                 .port(email_config.smtp_port as u16);
 
@@ -181,7 +182,7 @@ impl EmailDeliveryService {
             let transport = transport_builder
                 .build();
 
-            self.connection_cache.insert(email_config.user_id, transport);
+            e.insert(transport);
         }
 
         Ok(self.connection_cache.get(&email_config.user_id).unwrap())
@@ -305,6 +306,7 @@ impl EmailDeliveryService {
     }
 
     /// Clear the connection cache (useful for cleanup)
+    #[allow(dead_code)]
     pub fn clear_cache(&mut self) {
         self.connection_cache.clear();
     }

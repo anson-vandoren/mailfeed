@@ -325,9 +325,7 @@ async fn test_unauthorized_access_scenarios() {
         let resp = test::call_service(&app, req).await;
         assert!(
             resp.status() == 403 || resp.status() == 401,
-            "Regular user should not access admin endpoint: {} {}",
-            method,
-            endpoint
+            "Regular user should not access admin endpoint: {method} {endpoint}"
         );
     }
     

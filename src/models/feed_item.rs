@@ -36,7 +36,7 @@ impl<'a> NewFeedItem<'a> {
         {
             Ok(item) => Some(item),
             Err(e) => {
-                log::warn!("Error inserting feed item: {:?}", e);
+                log::warn!("Error inserting feed item: {e:?}");
                 None
             }
         }
@@ -57,7 +57,7 @@ impl<'a> NewFeedItem<'a> {
         {
             Ok(item) => Ok(Some(item)),
             Err(e) => {
-                log::warn!("Error inserting feed item: {:?}", e);
+                log::warn!("Error inserting feed item: {e:?}");
                 Err(e)
             }
         }
@@ -70,7 +70,7 @@ impl FeedItem {
         match feed_items.find(id).first::<FeedItem>(conn) {
             Ok(item) => Some(item),
             Err(e) => {
-                log::warn!("Error getting feed item: {:?}", e);
+                log::warn!("Error getting feed item: {e:?}");
                 None
             }
         }
@@ -84,7 +84,7 @@ impl FeedItem {
                 _ => Some(items),
             },
             Err(e) => {
-                log::warn!("Error getting feed items: {:?}", e);
+                log::warn!("Error getting feed items: {e:?}");
                 None
             }
         }
@@ -98,7 +98,7 @@ impl FeedItem {
                 _ => Some(items),
             },
             Err(e) => {
-                log::warn!("Error getting feed items: {:?}", e);
+                log::warn!("Error getting feed items: {e:?}");
                 None
             }
         }
@@ -117,7 +117,7 @@ impl FeedItem {
         {
             Ok(items) => items,
             Err(e) => {
-                log::warn!("Error getting feed items: {:?}", e);
+                log::warn!("Error getting feed items: {e:?}");
                 Vec::new()
             }
         }
@@ -144,8 +144,8 @@ mod tests {
         for i in 0..num_items {
             let item = NewFeedItem {
                 feed_id,
-                title: &format!("test_title_{}", i),
-                link: &format!("http://test.com/{}", i),
+                title: &format!("test_title_{i}"),
+                link: &format!("http://test.com/{i}"),
                 ..Default::default()
             };
             let fi = item.insert(conn);
