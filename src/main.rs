@@ -9,15 +9,15 @@ mod schema;
 mod security;
 mod session;
 mod tasks;
-mod telegram;
+mod telegram_client;
 #[cfg(test)]
 mod test_helpers;
 mod types;
 mod web_ui;
 
-use crate::session::SessionClaims;
 use crate::global::init_jwt_secret;
 use crate::models::user::{NewUser, PartialUser, User};
+use crate::session::SessionClaims;
 use actix_cors::Cors;
 use actix_files::Files;
 use actix_governor::Governor;
@@ -45,7 +45,7 @@ struct Args {
 
 fn main() -> std::io::Result<()> {
     dotenv().ok();
-    
+
     // Initialize structured logging
     // Initialize simple logging
     env_logger::init();
@@ -178,7 +178,7 @@ fn load_config() -> AppConfig {
 async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io::Result<()> {
     log::info!("Serving static files from {public_path}");
     log::info!("Starting server at http://127.0.0.1:{port}");
-    
+
     // Initialize metrics
     // Removed metrics - keeping simple
 
@@ -193,11 +193,11 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
             .allow_any_header()
             .supports_credentials()
             .max_age(3600);
-            
+
         // Create rate limiters
         let general_rate_limiter = security::create_rate_limiter();
         let auth_rate_limiter = security::create_auth_rate_limiter();
-            
+
         App::new()
             .wrap(tracing_actix_web::TracingLogger::default())
             .wrap(middleware::Compress::default())
@@ -214,7 +214,7 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
                     .service(api::auth::handlers::logout)
                     .service(api::auth::handlers::password_reset)
                     .service(api::auth::handlers::password_reset_confirm)
-                    .service(api::auth::handlers::change_password)
+                    .service(api::auth::handlers::change_password),
             )
             .service(api::health::routes()) // Health checks (no rate limiting)
             .service(
@@ -225,7 +225,7 @@ async fn run_server(public_path: String, db_pool: DbPool, port: u16) -> std::io:
                     .service(api::subscriptions::routes())
                     .service(api::feeds::routes())
                     .service(api::config::routes())
-                    .service(api::feed_items::routes())
+                    .service(api::feed_items::routes()),
             )
             .service(Files::new("/static", &public_path)) // Static files must come before web UI routes
             .service(web_ui::routes()) // Web UI routes

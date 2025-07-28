@@ -35,7 +35,9 @@ pub async fn create_user(
                 .ok_or(AppError::InternalError)?;
             Ok(HttpResponse::Ok().json(user))
         }
-        Err(UserTableError::EmailExists) => Err(AppError::duplicate_resource("User with this email")),
+        Err(UserTableError::EmailExists) => {
+            Err(AppError::duplicate_resource("User with this email"))
+        }
         Err(UserTableError::PasswordTooShort) => {
             Err(AppError::invalid_input("password", "Password is too short"))
         }
@@ -44,7 +46,11 @@ pub async fn create_user(
 }
 
 #[get("/{user_id}")]
-pub async fn get_user(pool: RqDbPool, user_path: RqUserId, claims: SessionClaims) -> impl Responder {
+pub async fn get_user(
+    pool: RqDbPool,
+    user_path: RqUserId,
+    claims: SessionClaims,
+) -> impl Responder {
     let id = user_path.user_id.parse::<i32>();
 
     if id.is_err() {
@@ -121,7 +127,11 @@ pub async fn update_user(
 }
 
 #[post("/{user_id}/test-telegram")]
-pub async fn test_telegram(pool: RqDbPool, user_path: RqUserId, claims: SessionClaims) -> impl Responder {
+pub async fn test_telegram(
+    pool: RqDbPool,
+    user_path: RqUserId,
+    claims: SessionClaims,
+) -> impl Responder {
     let id = match user_path.user_id.parse::<i32>() {
         Ok(id) => id,
         Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),
@@ -139,21 +149,22 @@ pub async fn test_telegram(pool: RqDbPool, user_path: RqUserId, claims: SessionC
         }
     };
 
-    let user = match crate::models::user::User::get(&mut conn, crate::models::user::UserQuery::Id(id)) {
-        Some(user) => user,
-        None => return HttpResponse::NotFound().body("User not found"),
-    };
+    let user =
+        match crate::models::user::User::get(&mut conn, crate::models::user::UserQuery::Id(id)) {
+            Some(user) => user,
+            None => return HttpResponse::NotFound().body("User not found"),
+        };
 
     if let Some(chat_id) = &user.telegram_chat_id {
         // Try to send a test message
-        match crate::telegram::client::TelegramClient::new(&mut conn) {
+        match crate::telegram_client::TelegramClient::new(&mut conn) {
             Ok(client) => {
                 let test_message = format!(
                     "<b>🧪 Mailfeed Test Message</b>\n\nHello! This is a test message from your Mailfeed bot.\n\n📊 <b>Your Settings:</b>\n• Chat ID: <code>{}</code>\n• Username: {}\n\nIf you received this, your Telegram integration is working! 🎉",
                     chat_id,
                     user.telegram_username.as_deref().unwrap_or("Not set")
                 );
-                
+
                 match client.send_html_message(chat_id, &test_message).await {
                     Ok(_) => {
                         log::info!("Test message sent successfully to chat_id: {chat_id}");
@@ -190,7 +201,11 @@ pub async fn test_telegram(pool: RqDbPool, user_path: RqUserId, claims: SessionC
 }
 
 #[delete("/{user_id}")]
-pub async fn delete_user(pool: RqDbPool, user_path: RqUserId, claims: SessionClaims) -> impl Responder {
+pub async fn delete_user(
+    pool: RqDbPool,
+    user_path: RqUserId,
+    claims: SessionClaims,
+) -> impl Responder {
     let id = match user_path.user_id.parse::<i32>() {
         Ok(id) => id,
         Err(_) => return HttpResponse::BadRequest().body("Invalid user ID"),

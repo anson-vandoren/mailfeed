@@ -7,7 +7,7 @@ pub mod schema;
 pub mod security;
 pub mod session;
 pub mod tasks;
-pub mod telegram;
+pub mod telegram_client;
 #[cfg(test)]
 pub mod test_helpers;
 pub mod types;

@@ -7,7 +7,7 @@ use crate::{
         user::User,
     },
     tasks::types::CHECK_INTERVAL,
-    telegram::client::TelegramClient,
+    telegram_client::TelegramClient,
     DbPool,
 };
 use chrono::{TimeZone, Utc};
@@ -17,7 +17,7 @@ pub async fn start(pool: DbPool) {
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
     loop {
         interval.tick().await;
-        
+
         let mut conn = match pool.get() {
             Ok(conn) => conn,
             Err(e) => {
@@ -25,7 +25,7 @@ pub async fn start(pool: DbPool) {
                 continue;
             }
         };
-        
+
         // Try to initialize Telegram client each time - allows for runtime configuration
         let telegram_client = match TelegramClient::new(&mut conn) {
             Ok(client) => client,
@@ -56,7 +56,7 @@ pub async fn start(pool: DbPool) {
                 }
 
                 let message_text = format_telegram_message(feed_data);
-                
+
                 match telegram_client
                     .send_html_message(telegram_chat_id, &message_text)
                     .await
@@ -87,7 +87,7 @@ pub async fn start(pool: DbPool) {
 fn items_to_send_by_user(conn: &mut SqliteConnection, user_id: i32) -> TelegramDeliveryData {
     let subscriptions = Subscription::get_all_for_user(conn, user_id).unwrap_or_default();
     let mut feed_data = Vec::new();
-    
+
     for sub in subscriptions {
         let feed_id = sub.feed_id;
         let last_sent = sub.last_sent_time;
@@ -124,7 +124,7 @@ fn items_to_send_by_user(conn: &mut SqliteConnection, user_id: i32) -> TelegramD
             });
         }
     }
-    
+
     TelegramDeliveryData { feed_data }
 }
 
@@ -138,7 +138,7 @@ fn format_telegram_message(feed_data: &FeedData) -> String {
     let mut message = format!(
         "<b>📰 {}</b>\n<a href=\"{}\">View Feed</a>\n\n",
         escape_html_text(&feed_data.feed_title),
-        feed_data.feed_link  // URLs in href attributes should not be HTML escaped
+        feed_data.feed_link // URLs in href attributes should not be HTML escaped
     );
 
     for item in &feed_data.new_items {
@@ -147,29 +147,23 @@ fn format_telegram_message(feed_data: &FeedData) -> String {
             .description
             .as_deref()
             .unwrap_or("No description provided");
-        
+
         // For Telegram HTML: escape text content but not URLs in href attributes
         let clean_title = escape_html_text(&item.title);
-        
+
         // Telegram HTML formatting - URLs should not be HTML escaped in href
         message.push_str(&format!(
             "📄 <a href=\"{}\">{}</a>\n",
-            item.link,  // Don't escape URLs in href attributes
+            item.link, // Don't escape URLs in href attributes
             clean_title
         ));
-        
-        message.push_str(&format!(
-            "🕐 {}\n",
-            date_time.format("%Y-%m-%d %H:%M:%S")
-        ));
-        
+
+        message.push_str(&format!("🕐 {}\n", date_time.format("%Y-%m-%d %H:%M:%S")));
+
         if let Some(author) = &item.author {
-            message.push_str(&format!(
-                "👤 {}\n",
-                escape_html_text(author)
-            ));
+            message.push_str(&format!("👤 {}\n", escape_html_text(author)));
         }
-        
+
         // Clean description and limit length for Telegram
         let clean_description = escape_html_text(description);
         let truncated_desc = if clean_description.len() > 200 {
@@ -182,11 +176,9 @@ fn format_telegram_message(feed_data: &FeedData) -> String {
         } else {
             clean_description
         };
-        
-        message.push_str(&format!(
-            "{truncated_desc}\n"
-        ));
-        
+
+        message.push_str(&format!("{truncated_desc}\n"));
+
         message.push_str("─────────────\n");
     }
 
@@ -196,12 +188,12 @@ fn format_telegram_message(feed_data: &FeedData) -> String {
         // Find the last complete feed item boundary (─────────────) to avoid cutting HTML
         let separator = "─────────────\n";
         let mut safe_truncate_pos = 3900;
-        
+
         // Find UTF-8 boundary first
         while safe_truncate_pos > 0 && !message.is_char_boundary(safe_truncate_pos) {
             safe_truncate_pos -= 1;
         }
-        
+
         // Now find the last separator before this position
         if let Some(last_separator) = message[..safe_truncate_pos].rfind(separator) {
             message.truncate(last_separator + separator.len());
